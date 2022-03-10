@@ -84,3 +84,14 @@ Example of command to deploy `single-nft-fa2-public-collection.arl` :
 ```
 
 [More info](https://completium.com/docs/cli/contract).
+
+
+
+// rarible mainnet
+https://better-call.dev/mainnet/KT18pVpRXKPY2c4U2yFEGSH3ZnhB2kL8kwXS/operations
+
+// stablecoin tqtezos
+https://better-call.dev/hangzhou2net/KT197sCXNP8q1tFmqzQxyJHaXrTQBaa9Qcbo/storage
+
+// metamask
+few legal visit uniform solid assault detail they skate twist ribbon about
