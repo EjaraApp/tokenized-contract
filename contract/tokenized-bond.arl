@@ -2,7 +2,7 @@
 * Private    : only owner or minter can mint
 * Multiple   : multiple collection
 **/
-archetype multiple_nft_public(owner : address)
+archetype tokenized_bond(owner : address)
 with metadata ""
 
 //----------------------------------------------------------------------------
@@ -37,7 +37,7 @@ constant INTER_TRANSFER_AFTER_EXPIRY_NOT_PAUSED  : string = "INTER_TRANSFER_AFTE
 variable owner_candidate : option<address> = none
 
 /**
-* Declares candidate for ownership
+* Transfer candidate for ownership
 * @param candidate address
 */
 entry transfer_ownership(candidate : address) {
@@ -48,7 +48,7 @@ entry transfer_ownership(candidate : address) {
 }
 
 /**
-* Claims ownership of the contract
+* Accept ownership of the contract
 * Note: fails if caller is not declared candidate
 */
 entry accept_ownership() {
@@ -135,10 +135,10 @@ variable inter_transfer_after_expiry_paused : bool = true // when true reciever 
 /**
  * Pause the contract execution
  */
-entry pause_inter_transfer_after_expiry() {
+entry pause_it_after_expiry() {
   called by owner
   effect {
-    dorequire(not inter_transfer_after_expiry_paused, INTER_TRANSFER_PAUSED);
+    dorequire(not inter_transfer_after_expiry_paused, INTER_TRANSFER_AFTER_EXPIRY_PAUSED);
     inter_transfer_after_expiry_paused := true
   }
 }
@@ -146,10 +146,10 @@ entry pause_inter_transfer_after_expiry() {
 /**
  * Resume the contract execution
  */
-entry resume_inter_transfer_after_expiry() {
+entry resume_it_after_expiry() {
   called by owner
   effect {
-    dorequire(inter_transfer_after_expiry_paused, INTER_TRANSFER_NOT_PAUSED);
+    dorequire(inter_transfer_after_expiry_paused, INTER_TRANSFER_AFTER_EXPIRY_NOT_PAUSED);
     inter_transfer_after_expiry_paused := false
   }
 }
@@ -187,8 +187,11 @@ function at_least_a_minter(%from: address, td: transfer_destination) : bool {
 * Asserts that the transfer has the minter of the bond as party if inter_transfer_paused = true
 */
 function inter_transfer_allowed(%from: address, td: transfer_destination) : bool {
-  if not inter_transfer_paused then return true;
-  return at_least_a_minter(%from, td)
+  return
+
+  (if not inter_transfer_paused
+  then true
+  else at_least_a_minter(%from, td))
 }
 
 /**
@@ -196,9 +199,10 @@ function inter_transfer_allowed(%from: address, td: transfer_destination) : bool
 */
 
 function minter_is_receiver_after_expiry(%from: address, td: transfer_destination) : bool {
-  if not inter_transfer_after_expiry_paused then return true;
-  if bond_metadata[td.bond_id_dest].bond_expiration_date >= now then return true;
-  return minter_is_reciever(%from, td)
+  return
+  (if not inter_transfer_after_expiry_paused then true
+  else if bond_metadata[td.bond_id_dest].bond_expiration_date >= now then true
+  else minter_is_reciever(%from, td))
 }
 
 
@@ -351,14 +355,13 @@ function check_owner_and_operator(txs : list<address * list<transfer_destination
   for tx in txs do
     var %from = tx[0];
     var tds = tx[1];
-    for td in tds do begin
+    for td in tds do
       res &= 
         if caller <> %from then 
           (operator.contains((caller,td.bond_id_dest,%from)) or 
            operator_for_all.contains((caller, %from))) 
         else 
           ledger.contains((td.bond_id_dest, caller));
-    end
     done
   done;
   return res
@@ -396,7 +399,7 @@ entry transfer_gasless (batch : list<list<address * list<transfer_destination>> 
         dorequire(pkh = %from, (SIGNER_NOT_FROM, (pkh, %from)));
         for td in tds do
           dorequire(inter_transfer_allowed(%from, td), NO_INTER_TRANSFER);
-          dorequire(minter_is_receiver_after_expiry(%from, td), NO_INTER_TRANSFER);
+          dorequire(minter_is_receiver_after_expiry(%from, td), NO_INTER_TRANSFER_AFTER_EXPIRY);
           var %to = td.to_dest;
           (* set bond ownership *)
           var bondid = td.bond_id_dest;
@@ -433,7 +436,7 @@ entry %transfer (txs : list<address * list<transfer_destination>>) {
       var tds = tx[1];
       for td in tds do
         dorequire(inter_transfer_allowed(%from, td), NO_INTER_TRANSFER);
-        dorequire(minter_is_receiver_after_expiry(%from, td), NO_INTER_TRANSFER);
+        dorequire(minter_is_receiver_after_expiry(%from, td), NO_INTER_TRANSFER_AFTER_EXPIRY);
         (* set bond ownership *)
         var bondid = td.bond_id_dest;
         var amount = ledger[(bondid, %from)].lamount;
@@ -487,7 +490,7 @@ entry mint (ibondid : nat, rate : rational, iamount : nat, iduration: duration, 
 * @param iamount amount to burn 
 */
 entry burn(ibondid : nat, iamount : nat) {
-  called by owner or minters
+  called by minters
   require { r2 : is_not_paused() }
   effect {
     if (ledger.contains((ibondid, caller))) then
