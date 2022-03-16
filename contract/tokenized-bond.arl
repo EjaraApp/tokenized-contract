@@ -165,13 +165,13 @@ function minter_is_sender(%from: address, td: transfer_destination) : bool {
 }
 
 /**
-* Asserts that the transfer has the minter as receiver
+* Asserts that the transfer has the minter as reciever
 */
 
 function minter_is_reciever(%from: address, td: transfer_destination) : bool {
-  var receiver_is_bond_minter = bond_metadata[td.bond_id_dest].bond_minter = td.to_dest;
-  var receiver_is_a_minter = minters.contains(td.to_dest);
-  return (receiver_is_a_minter and receiver_is_bond_minter)
+  var reciever_is_bond_minter = bond_metadata[td.bond_id_dest].bond_minter = td.to_dest;
+  var reciever_is_a_minter = minters.contains(td.to_dest);
+  return (reciever_is_a_minter and reciever_is_bond_minter)
 }
 
 
@@ -198,7 +198,7 @@ function inter_transfer_allowed(%from: address, td: transfer_destination) : bool
 * Asserts that reciever is minter after expiry of the bond
 */
 
-function minter_is_receiver_after_expiry(%from: address, td: transfer_destination) : bool {
+function minter_is_reciever_after_expiry(%from: address, td: transfer_destination) : bool {
   return
   (if not inter_transfer_after_expiry_paused then true
   else if bond_metadata[td.bond_id_dest].bond_expiration_date >= now then true
@@ -399,7 +399,7 @@ entry transfer_gasless (batch : list<list<address * list<transfer_destination>> 
         dorequire(pkh = %from, (SIGNER_NOT_FROM, (pkh, %from)));
         for td in tds do
           dorequire(inter_transfer_allowed(%from, td), NO_INTER_TRANSFER);
-          dorequire(minter_is_receiver_after_expiry(%from, td), NO_INTER_TRANSFER_AFTER_EXPIRY);
+          dorequire(minter_is_reciever_after_expiry(%from, td), NO_INTER_TRANSFER_AFTER_EXPIRY);
           var %to = td.to_dest;
           (* set bond ownership *)
           var bondid = td.bond_id_dest;
@@ -436,7 +436,7 @@ entry %transfer (txs : list<address * list<transfer_destination>>) {
       var tds = tx[1];
       for td in tds do
         dorequire(inter_transfer_allowed(%from, td), NO_INTER_TRANSFER);
-        dorequire(minter_is_receiver_after_expiry(%from, td), NO_INTER_TRANSFER_AFTER_EXPIRY);
+        dorequire(minter_is_reciever_after_expiry(%from, td), NO_INTER_TRANSFER_AFTER_EXPIRY);
         (* set bond ownership *)
         var bondid = td.bond_id_dest;
         var amount = ledger[(bondid, %from)].lamount;
