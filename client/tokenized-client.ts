@@ -3,7 +3,7 @@ import { InMemorySigner } from '@taquito/signer';
 
 interface transferObj {
     address: string;
-    bondId: number;
+    tokenId: number;
     amount: number;
 }
 
@@ -11,22 +11,11 @@ export interface transferDTO extends transferObj {
     transferType: 'deposit' | 'withdrawal';
 }
 
-interface transferDestination {
-    to: string;
-    bond_id: number;
-    amount: number;
-}
-
-interface smartContractTransfer {
-    from: string;
-    txs: Array<transferDestination>;
-}
-
 export class TokenizedClient {
     private tezos: TezosToolkit = new TezosToolkit('https://hangzhounet.smartpy.io');
     private contract?: WalletContract;
     private signerSet: boolean = false;
-    private bondMinters: Map<number, string> = new Map();
+    private tokenMinters: Map<number, string> = new Map();
     
     constructor(privateKey?: string) {
         if (privateKey !== undefined)
@@ -55,23 +44,13 @@ export class TokenizedClient {
                 default:
                     throw new Error(`Invalid transfer type ${transfer.transferType}`);
             }
-            // const sc: smartContractTransfer = {
-            //     from,
-            //     txs: [{
-            //         to_dest: to,
-            //         bond_id_dest: transfer.bondId,
-            //         bond_amount_dest: transfer.amount,
-            //     }],
-            // }
             const sc: Array<any> = [from, [{
                         to: to,
-                        bond_id: transfer.bondId,
+                        token_id: transfer.tokenId,
                         amount: transfer.amount,
                     }]]
-            console.log(sc);
             txs.push(sc);
         }
-        console.log(txs);
         
         const txHash : string = await this.smartContractTransfer(contractAddress, txs);
         return txHash;
@@ -94,11 +73,11 @@ export class TokenizedClient {
     }
 
     private async getMinter(contractAddress: string, transfer: transferDTO) : Promise<string> {
-        if (this.bondMinters.get(transfer.bondId) !== undefined) return this.bondMinters.get(transfer.bondId)!;
+        if (this.tokenMinters.get(transfer.tokenId) !== undefined) return this.tokenMinters.get(transfer.tokenId)!;
         await this.setContract(contractAddress);
         const st = (await this.contract?.storage()) as any;
-        const bond_meta = await st.bond_metadata.get(transfer.bondId);        
-        return bond_meta.bond_minter;
+        const token_meta = await st.token_metadata.get(transfer.tokenId);        
+        return token_meta.token_minter;
     }
 
     private async setContract(contractAddress: string) {

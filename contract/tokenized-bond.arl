@@ -22,13 +22,17 @@ constant PERMIT_EXPIRED                          : string = "PERMIT_EXPIRED"
 constant PERMIT_NOT_FOUND                        : string = "PERMIT_NOT_FOUND"
 constant PERMIT_USER_NOT_FOUND                   : string = "PERMIT_USER_NOT_FOUND"
 constant SIGNER_NOT_FROM                         : string = "SIGNER_NOT_FROM"
-constant NO_DOUBLE_MINTING                       : string = "BOND_ID_ALREADY_MINTED"
+constant NO_DOUBLE_MINTING                       : string = "TOKEN_ID_ALREADY_MINTED"
 constant NO_INTER_TRANSFER                       : string = "NO_INTER_TRANSFER"
 constant INTER_TRANSFER_PAUSED                   : string = "INTER_TRANSFER_PAUSED"
 constant INTER_TRANSFER_NOT_PAUSED               : string = "INTER_TRANSFER_NOT_PAUSED"
 constant NO_INTER_TRANSFER_AFTER_EXPIRY          : string = "NO_INTER_TRANSFER_AFTER_EXPIRY"
 constant INTER_TRANSFER_AFTER_EXPIRY_PAUSED      : string = "INTER_TRANSFER_AFTER_EXPIRY_PAUSED"
 constant INTER_TRANSFER_AFTER_EXPIRY_NOT_PAUSED  : string = "INTER_TRANSFER_AFTER_EXPIRY_NOT_PAUSED"
+constant TOKEN_FROZEN                            : string = "TOKEN_FROZEN"
+constant TOKEN_NOT_FROZEN                        : string = "TOKEN_NOT_FROZEN"
+constant MINTER_IS_OPERATOR                      : string = "MINTER_IS_OPERATOR"
+constant MINTER_IS_NOT_OPERATOR                  : string = "MINTER_IS_NOT_OPERATOR"
 
 //----------------------------------------------------------------------------
 // Owner role transfer
@@ -102,27 +106,25 @@ function is_not_paused() : bool {
 // INTER TRANSFER PAUSE AND RESUME
 //----------------------------------------------------------------
 
-variable inter_transfer_paused : bool = true // when true at least sender or reciever must be minter of bond
-
 /**
  * Pause the contract execution
  */
-entry pause_inter_transfer() {
+entry pause_inter_transfer(itoken_id: nat) {
   called by owner
   effect {
-    dorequire(not inter_transfer_paused, INTER_TRANSFER_PAUSED);
-    inter_transfer_paused := true
+    dorequire(not token_metadata[itoken_id].token_itr_paused, INTER_TRANSFER_PAUSED);
+    token_metadata[itoken_id].token_itr_paused := true
   }
 }
 
 /**
  * Resume the contract execution
  */
-entry resume_inter_transfer() {
+entry resume_inter_transfer(itoken_id: nat) {
   called by owner
   effect {
-    dorequire(inter_transfer_paused, INTER_TRANSFER_NOT_PAUSED);
-    inter_transfer_paused := false
+    dorequire(token_metadata[itoken_id].token_itr_paused, INTER_TRANSFER_NOT_PAUSED);
+    token_metadata[itoken_id].token_itr_paused := false
   }
 }
 
@@ -130,28 +132,85 @@ entry resume_inter_transfer() {
 // INTER TRANSFER AFTER EXPIRY PAUSE AND RESUME
 //----------------------------------------------------------------
 
-variable inter_transfer_after_expiry_paused : bool = true // when true reciever must be minter of bond after expiry
-
 /**
- * Pause the contract execution
+ * Pause inter transfer after expiry
  */
-entry pause_it_after_expiry() {
+entry pause_itr_after_expiry(itoken_id: nat) {
   called by owner
   effect {
-    dorequire(not inter_transfer_after_expiry_paused, INTER_TRANSFER_AFTER_EXPIRY_PAUSED);
-    inter_transfer_after_expiry_paused := true
+    dorequire(not token_metadata[itoken_id].token_itr_expiry_paused, INTER_TRANSFER_AFTER_EXPIRY_PAUSED);
+    token_metadata[itoken_id].token_itr_expiry_paused := true
   }
 }
 
 /**
- * Resume the contract execution
+ * Resume inter transfer after expiry
  */
-entry resume_it_after_expiry() {
+entry resume_itr_after_expiry(itoken_id: nat) {
   called by owner
   effect {
-    dorequire(inter_transfer_after_expiry_paused, INTER_TRANSFER_AFTER_EXPIRY_NOT_PAUSED);
-    inter_transfer_after_expiry_paused := false
+    dorequire(token_metadata[itoken_id].token_itr_expiry_paused, INTER_TRANSFER_AFTER_EXPIRY_NOT_PAUSED);
+    token_metadata[itoken_id].token_itr_expiry_paused := false
   }
+}
+
+//----------------------------------------------------------------
+// MINTER IS OPERATOR
+//----------------------------------------------------------------
+
+/**
+ * Set minter as operator
+ */
+entry set_minter_as_operator(itoken_id: nat) {
+  called by owner
+  effect {
+    dorequire(not token_metadata[itoken_id].minter_is_operator, MINTER_IS_OPERATOR);
+    token_metadata[itoken_id].minter_is_operator := true
+  }
+}
+
+/**
+ * Unset minter as operator
+ */
+entry unset_minter_as_operator(itoken_id: nat) {
+  called by owner
+  effect {
+    dorequire(token_metadata[itoken_id].minter_is_operator, MINTER_IS_NOT_OPERATOR);
+    token_metadata[itoken_id].minter_is_operator := false
+  }
+}
+
+//----------------------------------------------------------------
+// FREEZE TRANSFER OF TOKEN
+//----------------------------------------------------------------
+
+/**
+ * Freeze transfer of the token
+ */
+entry freeze_token(itoken_id: nat) {
+  called by owner
+  effect {
+    dorequire(not token_metadata[itoken_id].token_frozen, TOKEN_FROZEN);
+    token_metadata[itoken_id].token_frozen := true
+  }
+}
+
+/**
+ * Resume transfer of the token
+ */
+entry unfreeze_token(itoken_id: nat) {
+  called by owner
+  effect {
+    dorequire(token_metadata[itoken_id].token_frozen, TOKEN_NOT_FROZEN);
+    token_metadata[itoken_id].token_frozen := false
+  }
+}
+
+/**
+ * Asserts that the contract execution is not paused
+ */
+function is_not_frozen(itoken_id: nat) : bool {
+  return (not token_metadata[itoken_id].token_frozen)
 }
 
 /**
@@ -159,9 +218,9 @@ entry resume_it_after_expiry() {
 */
 
 function minter_is_sender(%from: address, td: transfer_destination) : bool {
-  var sender_is_bond_minter = bond_metadata[td.bond_id_dest].bond_minter = %from;
+  var sender_is_token_minter = token_metadata[td.token_id_dest].token_minter = %from;
   var sender_is_a_minter = minters.contains(%from);
-  return (sender_is_a_minter and sender_is_bond_minter)
+  return (sender_is_a_minter and sender_is_token_minter)
 }
 
 /**
@@ -169,14 +228,14 @@ function minter_is_sender(%from: address, td: transfer_destination) : bool {
 */
 
 function minter_is_reciever(%from: address, td: transfer_destination) : bool {
-  var reciever_is_bond_minter = bond_metadata[td.bond_id_dest].bond_minter = td.to_dest;
+  var reciever_is_token_minter = token_metadata[td.token_id_dest].token_minter = td.to_dest;
   var reciever_is_a_minter = minters.contains(td.to_dest);
-  return (reciever_is_a_minter and reciever_is_bond_minter)
+  return (reciever_is_a_minter and reciever_is_token_minter)
 }
 
 
 /**
-* Asserts that the transfer has the minter of the bond as party
+* Asserts that the transfer has the minter of the token as party
 */
 
 function at_least_a_minter(%from: address, td: transfer_destination) : bool {
@@ -184,27 +243,26 @@ function at_least_a_minter(%from: address, td: transfer_destination) : bool {
 }
 
 /**
-* Asserts that the transfer has the minter of the bond as party if inter_transfer_paused = true
+* Asserts that the transfer has the minter of the token as party if inter_transfer_paused = true
 */
 function inter_transfer_allowed(%from: address, td: transfer_destination) : bool {
   return
 
-  (if not inter_transfer_paused
+  (if not token_metadata[td.token_id_dest].token_itr_paused
   then true
   else at_least_a_minter(%from, td))
 }
 
 /**
-* Asserts that reciever is minter after expiry of the bond
+* Asserts that reciever is minter after expiry of the token
 */
 
 function minter_is_reciever_after_expiry(%from: address, td: transfer_destination) : bool {
   return
-  (if not inter_transfer_after_expiry_paused then true
-  else if bond_metadata[td.bond_id_dest].bond_expiration_date >= now then true
+  (if not token_metadata[td.token_id_dest].token_itr_expiry_paused then true
+  else if token_metadata[td.token_id_dest].token_expiration_date >= now then true
   else minter_is_reciever(%from, td))
 }
-
 
 //----------------------------------------------------------------------------
 // Metadata
@@ -224,7 +282,7 @@ entry set_metadata(ikey: string, idata : bytes) {
 
 asset minters identified by minter {
   minter: address;
-  is_active: bool = true;
+  tokens_minted: list<nat> = [];
 }
 
 entry add_minter(aminter: address) {
@@ -235,11 +293,22 @@ entry add_minter(aminter: address) {
   }
 }
 
-entry remove_minter(rminter: address) {
+entry replace_minter(ominter: address, nminter: address) {
   called by owner
-  require { r10: is_not_paused() }
+  require { 
+    r10: is_not_paused();
+    ominter_exists: minters.contains(ominter);
+    nminter_does_not_exist: not minters.contains(nminter);
+  }
   effect {
-    minters.remove(rminter)
+    // replace old minter with new minter in all minted tokens
+    for tk in minters[ominter].tokens_minted do
+      token_metadata.update(tk, {token_minter = nminter})
+    done;
+    // add new minter
+    minters.addupdate(nminter, { tokens_minted = minters[ominter].tokens_minted });
+    // remove old minter
+    minters.remove(ominter);
   }
 }
 
@@ -247,44 +316,48 @@ entry remove_minter(rminter: address) {
 // Data types
 //----------------------------------------------------------------------------
 
-asset ledger identified by lbond lowner to big_map {
-  lbond     : nat;
+asset ledger identified by ltoken lowner to big_map {
+  ltoken     : nat;
   lowner     : address;
   lamount    : nat = 0;
 }
 
-asset operator identified by oaddr obond oowner to big_map {
+asset operator identified by oaddr otoken oowner to big_map {
   oaddr       : address;
-  obond      : nat;
+  otoken      : nat;
   oowner      : address;
   ounit       : unit = Unit;
 }
 
-asset bond_metadata to big_map {
-  fbond_metadata : nat;
-  bond_id        : nat;
-  bond_minter: address;
-  bond_interest: rational;
-  bond_expiration_date: date;
-  bond_info      : map<string, bytes>;
+asset token_metadata to big_map {
+  ftoken_metadata : nat;
+  token_id        : nat;
+  token_minter: address;
+  token_interest: rational;
+  token_expiration_date: date;
+  token_info      : map<string, bytes>;
+  token_itr_paused: bool;
+  token_itr_expiry_paused: bool = true;
+  token_frozen: bool = false;
+  minter_is_operator: bool;
 }
 
 record operator_param {
   opp_owner    : address;
   opp_operator : address;
-  opp_bond_id : nat
-} as ((owner, (operator, bond_id)))
+  opp_token_id : nat
+} as ((owner, (operator, token_id)))
 
 record transfer_destination {
   to_dest           : address;
-  bond_id_dest     : nat;
-  bond_amount_dest : nat
-} as ((%to, (bond_id, amount)))
+  token_id_dest     : nat;
+  token_amount_dest : nat
+} as ((%to, (token_id, amount)))
 
 record balance_of_request {
   bo_owner : address;
-  bbond_id : nat;
-} as ((owner, bond_id))
+  btoken_id : nat;
+} as ((owner, token_id))
 
 record balance_of_response {
   request : balance_of_request;
@@ -308,7 +381,7 @@ asset operator_for_all identified by fa_oaddr fa_oowner to big_map {
 //----------------------------------------------------------------------------
 
 /**
-* Adds or removes operators for specified bonds
+* Adds or removes operators for specified tokens
 * @param upl list of add or remove operator specification
 */ 
 entry update_operators (upl : list<or<operator_param, operator_param>>) {
@@ -320,19 +393,19 @@ entry update_operators (upl : list<or<operator_param, operator_param>>) {
         dorequire(param.opp_owner = caller , CALLER_NOT_OWNER);
         operator.add({
           oaddr  = param.opp_operator; 
-          obond = param.opp_bond_id; 
+          otoken = param.opp_token_id; 
           oowner = param.opp_owner
         })
       | right(param) -> (* remove *)
         dorequire(param.opp_owner = caller , CALLER_NOT_OWNER);
-        operator.remove((param.opp_operator, param.opp_bond_id, param.opp_owner))
+        operator.remove((param.opp_operator, param.opp_token_id, param.opp_owner))
       end;
     done;
   }
 }
 
 /**
-* Adds or removes an operator for *all* transfers for caller's bonds
+* Adds or removes an operator for *all* transfers for caller's tokens
 * @param upl list of add or remove operator address
 */ 
 entry update_operators_for_all (upl : list<or<address, address>>) {
@@ -349,6 +422,14 @@ entry update_operators_for_all (upl : list<or<address, address>>) {
   }
 }
 
+function minter_is_operator_check(%from: address, td: transfer_destination) : bool {
+  return
+  (if not token_metadata[td.token_id_dest].minter_is_operator then false
+  else if caller <> token_metadata[td.token_id_dest].token_minter then false
+  else true
+  )
+}
+
 function check_owner_and_operator(txs : list<address * list<transfer_destination>>) : bool {
   var res = true;
 
@@ -358,13 +439,21 @@ function check_owner_and_operator(txs : list<address * list<transfer_destination
     for td in tds do
       res &= 
         if caller <> %from then 
-          (operator.contains((caller,td.bond_id_dest,%from)) or 
-           operator_for_all.contains((caller, %from))) 
+          (operator.contains((caller,td.token_id_dest,%from)) or 
+           operator_for_all.contains((caller, %from)) or minter_is_operator_check(%from, td)) 
         else 
-          ledger.contains((td.bond_id_dest, caller));
+          ledger.contains((td.token_id_dest, caller));
     done
   done;
   return res
+}
+
+
+function transfer_rules_check(%from: address, td: transfer_destination) : bool {
+  dorequire(inter_transfer_allowed(%from, td), NO_INTER_TRANSFER);
+  dorequire(minter_is_reciever_after_expiry(%from, td), NO_INTER_TRANSFER_AFTER_EXPIRY);
+  dorequire(is_not_frozen(td.token_id_dest), TOKEN_FROZEN);
+  return true
 }
 
 //----------------------------------------------------------------------------
@@ -372,13 +461,13 @@ function check_owner_and_operator(txs : list<address * list<transfer_destination
 //----------------------------------------------------------------------------
 
 /**
-* Transfers bonds with permits 
+* Transfers tokens with permits 
 * @param batch list of pairs of permits (key and signature) and transfer specification
 * Note: pk public key that signed 
 * Note: signature contract address * chain id * counter * data
 * Note: counter is to prevent replay attack
 * Note: a transfer specification is a list of pairs of 'from' address and transfer destination
-* Note: a transfer destination has a 'to' address, a bond id and an amount
+* Note: a transfer destination has a 'to' address, a token id and an amount
 */ 
 entry transfer_gasless (batch : list<list<address * list<transfer_destination>> * (key * signature)>) {
   require { r8 : is_not_paused() }
@@ -398,19 +487,18 @@ entry transfer_gasless (batch : list<list<address * list<transfer_destination>> 
         var tds = tx[1];
         dorequire(pkh = %from, (SIGNER_NOT_FROM, (pkh, %from)));
         for td in tds do
-          dorequire(inter_transfer_allowed(%from, td), NO_INTER_TRANSFER);
-          dorequire(minter_is_reciever_after_expiry(%from, td), NO_INTER_TRANSFER_AFTER_EXPIRY);
+          var can_transfer = transfer_rules_check(%from, td);
           var %to = td.to_dest;
-          (* set bond ownership *)
-          var bondid = td.bond_id_dest;
-          var amount = ledger[(bondid, %from)].lamount;
-          if td.bond_amount_dest > amount then
+          (* set token ownership *)
+          var tokenid = td.token_id_dest;
+          var amount = ledger[(tokenid, %from)].lamount;
+          if td.token_amount_dest > amount then
             fail(FA2_INSUFFICIENT_BALANCE)
-          else if td.bond_amount_dest = amount then
-            ledger.remove((bondid, %from))
+          else if td.token_amount_dest = amount then
+            ledger.remove((tokenid, %from))
           else
-            ledger.update((bondid, %from), { lamount -= td.bond_amount_dest });
-          ledger.addupdate((bondid, td.to_dest), { lamount += td.bond_amount_dest })
+            ledger.update((tokenid, %from), { lamount -= td.token_amount_dest });
+          ledger.addupdate((tokenid, td.to_dest), { lamount += td.token_amount_dest })
         done;
       done
     done
@@ -418,9 +506,9 @@ entry transfer_gasless (batch : list<list<address * list<transfer_destination>> 
 }
 
 /**
-* Transfers bonds
+* Transfers tokens
 * @param txs list of pairs of 'from' address and transfer destination
-* Note : a transfer destination has a 'to' address, a bond id and an amount
+* Note : a transfer destination has a 'to' address, a token id and an amount
 * Note : if caller is not 'from' nor operator, it checks if there is a permit
 */
 entry %transfer (txs : list<address * list<transfer_destination>>) {
@@ -435,18 +523,17 @@ entry %transfer (txs : list<address * list<transfer_destination>>) {
       var %from = tx[0];
       var tds = tx[1];
       for td in tds do
-        dorequire(inter_transfer_allowed(%from, td), NO_INTER_TRANSFER);
-        dorequire(minter_is_reciever_after_expiry(%from, td), NO_INTER_TRANSFER_AFTER_EXPIRY);
-        (* set bond ownership *)
-        var bondid = td.bond_id_dest;
-        var amount = ledger[(bondid, %from)].lamount;
-        if td.bond_amount_dest > amount then
+        var can_transfer = transfer_rules_check(%from, td);
+        (* set token ownership *)
+        var tokenid = td.token_id_dest;
+        var amount = ledger[(tokenid, %from)].lamount;
+        if td.token_amount_dest > amount then
           fail(FA2_INSUFFICIENT_BALANCE)
-        else if td.bond_amount_dest = amount then
-          ledger.remove((bondid, %from))
+        else if td.token_amount_dest = amount then
+          ledger.remove((tokenid, %from))
         else
-          ledger.update((bondid, %from), { lamount -= td.bond_amount_dest });
-        ledger.addupdate((bondid, td.to_dest), { lamount += td.bond_amount_dest })
+          ledger.update((tokenid, %from), { lamount -= td.token_amount_dest });
+        ledger.addupdate((tokenid, td.to_dest), { lamount += td.token_amount_dest })
       done;
     done
   }
@@ -457,49 +544,52 @@ entry %transfer (txs : list<address * list<transfer_destination>>) {
 //----------------------------------------------------------------------------
 
 /**
-* Mint new bond
-* @param ibondid bond id to mint
-* @param rate interest percent earned on bond at the end of duration
-* @param iamount amount of bond
-* @param ibondMetadata bond metadata
+* Mint new token
+* @param itokenid token id to mint
+* @param rate interest percent earned on token at the end of duration
+* @param iamount amount of token
+* @param itokenMetadata token metadata
 */
-entry mint (ibondid : nat, rate : rational, iamount : nat, iduration: duration, ibondMetadata: map<string, bytes>) {
+entry mint (itokenid : nat, rate : rational, iamount : nat, expiration: date, custodial: bool, itokenMetadata: map<string, bytes>) {
   called by minters
   require { r11: is_not_paused() }
   effect {
     // add expiration date
-    var expires_on: date = now + iduration;
-    bond_metadata.add({
-      fbond_metadata = ibondid; 
-      bond_id = ibondid; 
-      bond_minter = caller; 
-      bond_expiration_date = expires_on;
-      bond_interest = rate;
-      bond_info = ibondMetadata
+    token_metadata.add({
+      ftoken_metadata = itokenid; 
+      token_id = itokenid; 
+      token_minter = caller; 
+      token_expiration_date = expiration;
+      token_interest = rate;
+      token_info = itokenMetadata;
+      token_itr_paused = custodial;
+      minter_is_operator  = custodial
     });
-    // make sure bond hasnt been minted already
-    if (ledger.contains((ibondid, caller))) then fail(NO_DOUBLE_MINTING);
+    // make sure token hasnt been minted already
+    if (ledger.contains((itokenid, caller))) then fail(NO_DOUBLE_MINTING);
     // minted directly to the address of the minter
-    ledger.add({ lbond = ibondid; lowner = caller; lamount = iamount });
+    ledger.add({ ltoken = itokenid; lowner = caller; lamount = iamount });
+    // add token to minters token lists
+    minters.update(caller, { tokens_minted = prepend(minters[caller].tokens_minted, itokenid) })
   }
 }
 
 /**
-* Burn an amount of bond
-* @param ibondid bond to burn
+* Burn an amount of token
+* @param itokenid token to burn
 * @param iamount amount to burn 
 */
-entry burn(ibondid : nat, iamount : nat) {
+entry burn(itokenid : nat, iamount : nat) {
   called by minters
   require { r2 : is_not_paused() }
   effect {
-    if (ledger.contains((ibondid, caller))) then
+    if (ledger.contains((itokenid, caller))) then
     begin
-      var vamount = ledger[(ibondid, caller)].lamount;
+      var vamount = ledger[(itokenid, caller)].lamount;
       if (vamount > iamount)
-      then ledger.update((ibondid, caller), { lamount -= iamount })
+      then ledger.update((itokenid, caller), { lamount -= iamount })
       else if (vamount = iamount)
-        then ledger.remove((ibondid, caller))
+        then ledger.remove((itokenid, caller))
         else fail(FA2_INSUFFICIENT_BALANCE);
     end
     else
@@ -519,8 +609,8 @@ getter balance_of (requests : list<balance_of_request>) : list<balance_of_respon
   return map(requests, br -> {
     request = br;
     balance_ = (
-      if ledger.contains((br.bbond_id, br.bo_owner))
-      then ledger[(br.bbond_id, br.bo_owner)].lamount
+      if ledger.contains((br.btoken_id, br.bo_owner))
+      then ledger[(br.btoken_id, br.bo_owner)].lamount
       else 0
     )
   })
