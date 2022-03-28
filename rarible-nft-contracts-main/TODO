@@ -1,7 +1,0 @@
-Tests
-- add set royalties Tests
-- fix burn methods everywhere
-
-- for single fa2 public
-    - check burn notfound + check burn insufficient balance
-- single fa2 private
