@@ -37,6 +37,6 @@ The implementation forked and modified this code https://gitlab.com/tezos-paris-
 
 
 
-###### Temple Wallet
+###### To Do
 
 - update tests to reflect changes from forked code.
