@@ -3,6 +3,8 @@ Smart contract for tokenized bond
 
 Specification https://app.clickup.com/20509715/v/dc/khx0k-5404/khx0k-3664 
 
+The implementation forked and modified this code https://gitlab.com/tezos-paris-hub/rarible/rarible-nft-contracts/-/blob/main/contracts/multiple-nft-public/multiple-nft-fa2-public-collection.arl
+
 ## Completium Cli Commands
 
 ### deploy contract
@@ -37,4 +39,4 @@ Specification https://app.clickup.com/20509715/v/dc/khx0k-5404/khx0k-3664
 
 ###### Temple Wallet
 
-pizza jungle grace early arena wolf cluster debate north stable select sheriff
+- update tests to reflect changes from 
