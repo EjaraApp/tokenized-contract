@@ -39,4 +39,4 @@ The implementation forked and modified this code https://gitlab.com/tezos-paris-
 
 ###### Temple Wallet
 
-- update tests to reflect changes from 
+- update tests to reflect changes from forked code.
