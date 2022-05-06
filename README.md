@@ -17,7 +17,7 @@ The implementation forked and modified this code https://gitlab.com/tezos-paris-
 `completium-cli call tokenized-bond --entry mint --arg '{"ibondid": 1, "rate": [1, 20], "iamount": 1000000000, "expiration": "2022-03-31T12:00:00Z", custodial: true, "ibondMetadata": [{"key": "", "value": ""}]}'`
 
 ### transfer
-`completium-cli call tokenized-bond --entry transfer --arg '{"txs": [["tz1Pi9pWrbrya2woZyG6Tja2z7pHFCTVnDQK", [["tz1RgtiSzRaYUgVsamm65repNdgXasMxokB9", 1, 1 ]]]]}'`
+`completium-cli call tokenized-bond --entry transfer --arg '{"txs": [["tz1Pi9pWrbrya2woZyG6Tja2z7pHFCTVnDQK", [["tz1RgtiSzRaYUgVopp_token_idsamm65repNdgXasMxokB9", 1, 1 ]]]]}'`
 
 ### set_minter_as_operator
 `completium-cli call tokenized-bond --entry set_minter_as_operator --arg '{"itoken_id": 1}'`
