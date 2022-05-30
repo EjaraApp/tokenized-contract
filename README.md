@@ -25,12 +25,13 @@ The implementation forked and modified this code https://gitlab.com/tezos-paris-
 ### pause_inter_transfer
 `completium-cli call tokenized-bond --entry pause_inter_transfer --arg '{"itoken_id": 1}'`
 
-## HangZhou Testnet Deployments
+## Testnet Deployments
 
 |version | url |
 |--|--|
 |v1.0.0|https://better-call.dev/hangzhou2net/KT1VCgCds84Y4pfxk56sm5fE1PkR1DRewmMV|
 |v1.2.1|https://better-call.dev/hangzhou2net/KT1Rq67pDu4jJf56VPT8bmbr1wnGuCZCAHm6|
+|v1.2.1-ithaca|https://better-call.dev/ithacanet/KT1SoexX6YLLkntCRNEjFoC1q99eHg188sfJ|
 
 
 ## Mainnet Deployments

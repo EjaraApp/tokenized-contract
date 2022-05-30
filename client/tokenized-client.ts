@@ -12,7 +12,7 @@ export interface transferDTO extends transferObj {
 }
 
 export class TokenizedClient {
-    private tezos: TezosToolkit = new TezosToolkit('https://hangzhounet.smartpy.io');
+    private tezos: TezosToolkit = new TezosToolkit('https://ithacanet.smartpy.io');
     private contract?: WalletContract;
     private signerSet: boolean = false;
     private tokenMinters: Map<number, string> = new Map();
