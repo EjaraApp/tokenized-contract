@@ -30,7 +30,7 @@ const carl   = getAccount(mockup_mode ? 'carl'       : 'carl');
 const daniel = getAccount(mockup_mode ? 'bootstrap1' : 'bootstrap1');
 
 //set endpointhead 
-setEndpoint(mockup_mode ? 'mockup' : 'https://hangzhounet.smartpy.io');
+setEndpoint(mockup_mode ? 'mockup' : 'https://ithacanet.smartpy.io');
 
 const amount = 100;
 let tokenId = 0;
@@ -65,10 +65,10 @@ async function expectToThrowMissigned(f, e) {
     }
 }
 
-describe('[Multiple Private NFT] Contract deployment', async () => {
+describe('[Tokenized Bond] Contract deployment', async () => {
     it('FA2 private collection contract deployment should succeed', async () => {
         [fa2, _] = await deploy(
-            './contracts/multiple-nft-private/multiple-nft-fa2-private-collection.arl',
+            './contract/tokenized-bond.arl',
             {
                 parameters: {
                     owner: alice.pkh,
@@ -79,7 +79,7 @@ describe('[Multiple Private NFT] Contract deployment', async () => {
     });
 });
 
-describe('[Multiple Private NFT] Add Minter', async () => {
+describe('[Tokenized Bond] Add Minter', async () => {
     it('Add minter as non owner should fail', async () => {
         await expectToThrow(async () => {
             await fa2.add_minter({
@@ -102,7 +102,7 @@ describe('[Multiple Private NFT] Add Minter', async () => {
     });
 });
 
-describe('[Multiple Private NFT] Remove Minter', async () => {
+describe('[Tokenized Bond] Remove Minter', async () => {
     it('Remove minter as non owner should fail', async () => {
         await expectToThrow(async () => {
             await fa2.remove_minter({
@@ -135,7 +135,7 @@ describe('[Multiple Private NFT] Remove Minter', async () => {
     });
 });
 
-describe('[Multiple Private NFT] Minting', async () => {
+describe('[Tokenized Bond] Minting', async () => {
     it('Mint tokens on FA2 Private collection contract as owner for ourself should succeed', async () => {
         await fa2.mint({
             arg: {
@@ -264,7 +264,7 @@ describe('[Multiple Private NFT] Minting', async () => {
     });
 });
 
-describe('[Multiple Private NFT] Update operators', async () => {
+describe('[Tokenized Bond] Update operators', async () => {
     it('Add an operator for ourself should succeed', async () => {
         const storage = await fa2.getStorage();
         var initialOperators = await getValueFromBigMap(
@@ -339,7 +339,7 @@ describe('[Multiple Private NFT] Update operators', async () => {
     });
 });
 
-describe('[Multiple Private NFT] Update operators for all', async () => {
+describe('[Tokenized Bond] Update operators for all', async () => {
     it('Add an operator for all for ourself should succeed', async () => {
         const storage = await fa2.getStorage();
         var initialOperators = await getValueFromBigMap(
@@ -396,7 +396,7 @@ describe('[Multiple Private NFT] Update operators for all', async () => {
     });
 });
 
-describe('[Multiple Private NFT] Add permit', async () => {
+describe('[Tokenized Bond] Add permit', async () => {
     it('Add a permit with the wrong signature should fail', async () => {
         await expectToThrowMissigned(async () => {
             permit = await mkTransferPermit(
@@ -648,7 +648,7 @@ describe('[Multiple Private NFT] Add permit', async () => {
     });
 });
 
-describe('[Multiple Private NFT] Transfers', async () => {
+describe('[Tokenized Bond] Transfers', async () => {
     it('Transfer a token not owned should fail', async () => {
         await expectToThrow(async () => {
             await fa2.transfer({
@@ -888,136 +888,8 @@ describe('[Multiple Private NFT] Transfers', async () => {
     });
 });
 
-describe('[Single Public NFT] Transfers gasless ', async () => {
-    it('Transfer a token not owned should fail', async () => {
-        await expectToThrowMissigned(async () => {
-            const testTokenId = 666
-            permit = await mkTransferGaslessArgs(
-                alice,
-                bob,
-                fa2.address,
-                amount,
-                tokenId,
-                alicePermitNb
-            );
-            await fa2.transfer_gasless({
-                argMichelson: `{ Pair { Pair "${alice.pkh}" { Pair "${bob.pkh}" (Pair ${testTokenId} ${amount}) } } (Pair "${alice.pubk}" "${permit.sig.prefixSig}" )}`,
-                as: alice.pkh,
-            });
-        }, errors.MISSIGNED);
-    });
 
-    it('Transfer a token from another user with wrong a permit should fail', async () => {
-        await expectToThrowMissigned(async () => {
-            const testTokenId = 1
-            permit = await mkTransferGaslessArgs(
-                alice,
-                bob,
-                fa2.address,
-                amount,
-                tokenId,
-                alicePermitNb
-            );
-            await fa2.transfer_gasless({
-                argMichelson: `{ Pair { Pair "${alice.pkh}" { Pair "${bob.pkh}" (Pair ${testTokenId} ${amount}) } } (Pair "${bob.pubk}" "${permit.sig.prefixSig}" )}`,
-                as: bob.pkh,
-            });
-        }, errors.MISSIGNED);
-    });
-
-    it('Transfer more tokens that owned should fail', async () => {
-        await expectToThrowMissigned(async () => {
-            const testTokenId = 1
-            permit = await mkTransferGaslessArgs(
-                alice,
-                bob,
-                fa2.address,
-                666666,
-                testTokenId,
-                alicePermitNb
-            );
-            await fa2.transfer_gasless({
-                argMichelson: `{ Pair { Pair "${alice.pkh}" { Pair "${bob.pkh}" (Pair ${testTokenId} ${amount}) } } (Pair "${bob.pubk}" "${permit.sig.prefixSig}" )}`,
-                as: alice.pkh,
-            });
-        }, errors.MISSIGNED);
-    });
-
-
-    it('Transfer tokens with permit should succeed', async () => {
-        const storage = await fa2.getStorage();
-        const testTokenId = 11111
-
-        await fa2.mint({
-            arg: {
-                itokenid: testTokenId,
-                iowner: alice.pkh,
-                iamount: amount,
-                itokenMetadata: [{ key: '', value: '0x' }],
-                iroyalties: [
-                    [alice.pkh, 1000],
-                    [bob.pkh, 500],
-                ],
-            },
-            as: alice.pkh,
-        });
-
-        permit = await mkTransferGaslessArgs(
-            alice,
-            bob,
-            fa2.address,
-            amount,
-            testTokenId,
-            alicePermitNb
-        );
-
-        alicePermitNb++;
-
-        var aliceBalances = await getValueFromBigMap(
-            parseInt(storage.ledger),
-            exprMichelineToJson(`(Pair ${testTokenId} "${alice.pkh}")`),
-            exprMichelineToJson(`(pair nat address))'`)
-        );
-        assert(aliceBalances.int == amount);
-        var bobBalances = await getValueFromBigMap(
-            parseInt(storage.ledger),
-            exprMichelineToJson(`(Pair ${testTokenId} "${bob.pkh}")`),
-            exprMichelineToJson(`(pair nat address))'`)
-        );
-        assert(bobBalances == null);
-
-        await fa2.transfer_gasless({
-            argMichelson: `{ Pair { Pair "${alice.pkh}" { Pair "${bob.pkh}" (Pair ${testTokenId} ${amount}) } } (Pair "${alice.pubk}" "${permit.sig.prefixSig}" )}`,
-            as: bob.pkh,
-        });
-
-        var addedPermit = await getValueFromBigMap(
-            parseInt(storage.permits),
-            exprMichelineToJson(`"${alice.pkh}"`),
-            exprMichelineToJson(`address'`)
-        );
-
-        assert(
-            ""+alicePermitNb == addedPermit.args[0].int
-        );
-
-        var alicePostTransferBalances = await getValueFromBigMap(
-            parseInt(storage.ledger),
-            exprMichelineToJson(`(Pair ${testTokenId} "${alice.pkh}")`),
-            exprMichelineToJson(`(pair nat address))'`)
-        );
-        assert(alicePostTransferBalances == null);
-        var bobPostTransferBalances = await getValueFromBigMap(
-            parseInt(storage.ledger),
-            exprMichelineToJson(`(Pair ${testTokenId} "${bob.pkh}")`),
-            exprMichelineToJson(`(pair nat address))'`)
-        );
-        assert(bobPostTransferBalances.int == amount);
-    });
-
-});
-
-describe('[Multiple Private NFT] Set metadata', async () => {
+describe('[Tokenized Bond] Set metadata', async () => {
     it('Set metadata with empty content should succeed', async () => {
         const argM = `(Pair "key" 0x)`;
         const storage = await fa2.getStorage();
@@ -1063,7 +935,7 @@ describe('[Multiple Private NFT] Set metadata', async () => {
     });
 });
 
-describe('[Multiple Private NFT] Set expiry', async () => {
+describe('[Tokenized Bond] Set expiry', async () => {
 
     it('Set global expiry with too big value should fail', async () => {
         const argMExp = `(Pair (Some 999999999999999999999999999999999999999) (None))`;
@@ -1252,7 +1124,7 @@ describe('[Multiple Private NFT] Set expiry', async () => {
     });
 });
 
-describe('[Multiple Private NFT] Burn', async () => {
+describe('[Tokenized Bond] Burn', async () => {
     it('Burn without tokens should fail', async () => {
         await expectToThrow(async () => {
             await fa2.burn({
@@ -1349,7 +1221,7 @@ describe('[Multiple Private NFT] Burn', async () => {
     });
 });
 
-describe('[Multiple Private NFT] Pause', async () => {
+describe('[Tokenized Bond] Pause', async () => {
     it('Set pause should succeed', async () => {
         await fa2.pause({
             as: alice.pkh,
@@ -1489,7 +1361,7 @@ describe('[Multiple Private NFT] Pause', async () => {
     });
 });
 
-describe('[Multiple Private NFT] Transfer ownership', async () => {
+describe('[Tokenized Bond] Transfer ownership', async () => {
     it('Transfer ownership as non owner should fail', async () => {
         await fa2.unpause({
             as: alice.pkh,

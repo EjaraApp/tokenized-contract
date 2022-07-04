@@ -56,9 +56,9 @@ entry transfer_ownership(candidate : address) {
 * Note: fails if caller is not declared candidate
 */
 entry accept_ownership() {
-  called by opt_get(owner_candidate)
+  called by get_some(owner_candidate)
   effect {
-    owner := opt_get(owner_candidate);
+    owner := get_some(owner_candidate);
     owner_candidate := none
   }
 }
@@ -75,7 +75,7 @@ variable paused : bool = false
 entry pause() {
   called by owner
   effect {
-    dorequire(not paused, CONTRACT_PAUSED);
+    do_require(not paused, CONTRACT_PAUSED);
     paused := true
   }
 }
@@ -86,7 +86,7 @@ entry pause() {
 entry unpause() {
   called by owner
   effect {
-    dorequire(paused, CONTRACT_NOT_PAUSED);
+    do_require(paused, CONTRACT_NOT_PAUSED);
     paused := false
   }
 }
@@ -112,7 +112,7 @@ function is_not_paused() : bool {
 entry pause_inter_transfer(itoken_id: nat) {
   called by owner
   effect {
-    dorequire(not token_metadata[itoken_id].token_itr_paused, INTER_TRANSFER_PAUSED);
+    do_require(not token_metadata[itoken_id].token_itr_paused, INTER_TRANSFER_PAUSED);
     token_metadata[itoken_id].token_itr_paused := true
   }
 }
@@ -123,7 +123,7 @@ entry pause_inter_transfer(itoken_id: nat) {
 entry resume_inter_transfer(itoken_id: nat) {
   called by owner
   effect {
-    dorequire(token_metadata[itoken_id].token_itr_paused, INTER_TRANSFER_NOT_PAUSED);
+    do_require(token_metadata[itoken_id].token_itr_paused, INTER_TRANSFER_NOT_PAUSED);
     token_metadata[itoken_id].token_itr_paused := false
   }
 }
@@ -138,7 +138,7 @@ entry resume_inter_transfer(itoken_id: nat) {
 entry pause_itr_after_expiry(itoken_id: nat) {
   called by owner
   effect {
-    dorequire(not token_metadata[itoken_id].token_itr_expiry_paused, INTER_TRANSFER_AFTER_EXPIRY_PAUSED);
+    do_require(not token_metadata[itoken_id].token_itr_expiry_paused, INTER_TRANSFER_AFTER_EXPIRY_PAUSED);
     token_metadata[itoken_id].token_itr_expiry_paused := true
   }
 }
@@ -149,7 +149,7 @@ entry pause_itr_after_expiry(itoken_id: nat) {
 entry resume_itr_after_expiry(itoken_id: nat) {
   called by owner
   effect {
-    dorequire(token_metadata[itoken_id].token_itr_expiry_paused, INTER_TRANSFER_AFTER_EXPIRY_NOT_PAUSED);
+    do_require(token_metadata[itoken_id].token_itr_expiry_paused, INTER_TRANSFER_AFTER_EXPIRY_NOT_PAUSED);
     token_metadata[itoken_id].token_itr_expiry_paused := false
   }
 }
@@ -164,7 +164,7 @@ entry resume_itr_after_expiry(itoken_id: nat) {
 entry set_minter_as_operator(itoken_id: nat) {
   called by owner
   effect {
-    dorequire(not token_metadata[itoken_id].minter_is_operator, MINTER_IS_OPERATOR);
+    do_require(not token_metadata[itoken_id].minter_is_operator, MINTER_IS_OPERATOR);
     token_metadata[itoken_id].minter_is_operator := true
   }
 }
@@ -175,7 +175,7 @@ entry set_minter_as_operator(itoken_id: nat) {
 entry unset_minter_as_operator(itoken_id: nat) {
   called by owner
   effect {
-    dorequire(token_metadata[itoken_id].minter_is_operator, MINTER_IS_NOT_OPERATOR);
+    do_require(token_metadata[itoken_id].minter_is_operator, MINTER_IS_NOT_OPERATOR);
     token_metadata[itoken_id].minter_is_operator := false
   }
 }
@@ -190,7 +190,7 @@ entry unset_minter_as_operator(itoken_id: nat) {
 entry freeze_token(itoken_id: nat) {
   called by owner
   effect {
-    dorequire(not token_metadata[itoken_id].token_frozen, TOKEN_FROZEN);
+    do_require(not token_metadata[itoken_id].token_frozen, TOKEN_FROZEN);
     token_metadata[itoken_id].token_frozen := true
   }
 }
@@ -201,7 +201,7 @@ entry freeze_token(itoken_id: nat) {
 entry unfreeze_token(itoken_id: nat) {
   called by owner
   effect {
-    dorequire(token_metadata[itoken_id].token_frozen, TOKEN_NOT_FROZEN);
+    do_require(token_metadata[itoken_id].token_frozen, TOKEN_NOT_FROZEN);
     token_metadata[itoken_id].token_frozen := false
   }
 }
@@ -289,7 +289,7 @@ entry add_minter(aminter: address) {
   called by owner
   require { r9: is_not_paused() }
   effect {
-    minters.addupdate(aminter, {})
+    minters.add_update(aminter, {})
   }
 }
 
@@ -306,7 +306,7 @@ entry replace_minter(ominter: address, nminter: address) {
       token_metadata.update(tk, {token_minter = nminter})
     done;
     // add new minter
-    minters.addupdate(nminter, { tokens_minted = minters[ominter].tokens_minted });
+    minters.add_update(nminter, { tokens_minted = minters[ominter].tokens_minted });
     // remove old minter
     minters.remove(ominter);
   }
@@ -390,14 +390,14 @@ entry update_operators (upl : list<or<operator_param, operator_param>>) {
     for up in upl do
       match up with
       | left(param)  -> (* add *)
-        dorequire(param.opp_owner = caller , CALLER_NOT_OWNER);
+        do_require(param.opp_owner = caller , CALLER_NOT_OWNER);
         operator.add({
           oaddr  = param.opp_operator; 
           otoken = param.opp_token_id; 
           oowner = param.opp_owner
         })
       | right(param) -> (* remove *)
-        dorequire(param.opp_owner = caller , CALLER_NOT_OWNER);
+        do_require(param.opp_owner = caller , CALLER_NOT_OWNER);
         operator.remove((param.opp_operator, param.opp_token_id, param.opp_owner))
       end;
     done;
@@ -450,9 +450,9 @@ function check_owner_and_operator(txs : list<address * list<transfer_destination
 
 
 function transfer_rules_check(%from: address, td: transfer_destination) : bool {
-  dorequire(inter_transfer_allowed(%from, td), NO_INTER_TRANSFER);
-  dorequire(minter_is_reciever_after_expiry(%from, td), NO_INTER_TRANSFER_AFTER_EXPIRY);
-  dorequire(is_not_frozen(td.token_id_dest), TOKEN_FROZEN);
+  do_require(inter_transfer_allowed(%from, td), NO_INTER_TRANSFER);
+  do_require(minter_is_reciever_after_expiry(%from, td), NO_INTER_TRANSFER_AFTER_EXPIRY);
+  do_require(is_not_frozen(td.token_id_dest), TOKEN_FROZEN);
   return true
 }
 
@@ -475,17 +475,17 @@ entry transfer_gasless (batch : list<list<address * list<transfer_destination>> 
     for b in batch do
       var pk  = b[1][0];
       var sig = b[1][1];
-      var pkh = key_address(pk);
+      var pkh = key_to_address(pk);
 
       var lcounter = if permits.contains(pkh) then permits[pkh].counter else 0;
-      var data : bytes = pack((selfaddress, lcounter, blake2b(pack(b[0]))));
+      var data : bytes = pack((self_address, lcounter, blake2b(pack(b[0]))));
       if not check_signature(pk, sig, data) then fail((MISSIGNED, data));
-      permits.addupdate(pkh, { counter = (lcounter + 1)});
+      permits.add_update(pkh, { counter = (lcounter + 1)});
 
       for tx in b[0] do
         var %from = tx[0];
         var tds = tx[1];
-        dorequire(pkh = %from, (SIGNER_NOT_FROM, (pkh, %from)));
+        do_require(pkh = %from, (SIGNER_NOT_FROM, (pkh, %from)));
         for td in tds do
           var can_transfer = transfer_rules_check(%from, td);
           var %to = td.to_dest;
@@ -498,7 +498,7 @@ entry transfer_gasless (batch : list<list<address * list<transfer_destination>> 
             ledger.remove((tokenid, %from))
           else
             ledger.update((tokenid, %from), { lamount -= td.token_amount_dest });
-          ledger.addupdate((tokenid, td.to_dest), { lamount += td.token_amount_dest })
+          ledger.add_update((tokenid, td.to_dest), { lamount += td.token_amount_dest })
         done;
       done
     done
@@ -533,7 +533,7 @@ entry %transfer (txs : list<address * list<transfer_destination>>) {
           ledger.remove((tokenid, %from))
         else
           ledger.update((tokenid, %from), { lamount -= td.token_amount_dest });
-        ledger.addupdate((tokenid, td.to_dest), { lamount += td.token_amount_dest })
+        ledger.add_update((tokenid, td.to_dest), { lamount += td.token_amount_dest })
       done;
     done
   }
@@ -552,7 +552,10 @@ entry %transfer (txs : list<address * list<transfer_destination>>) {
 */
 entry mint (itokenid : nat, rate : rational, iamount : nat, expiration: date, custodial: bool, itokenMetadata: map<string, bytes>) {
   called by minters
-  require { r11: is_not_paused() }
+  require {
+    r11: is_not_paused();
+    r12: expiration > now 
+   }
   effect {
     // add expiration date
     token_metadata.add({
