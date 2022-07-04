@@ -554,7 +554,9 @@ entry mint (itokenid : nat, rate : rational, iamount : nat, expiration: date, cu
   called by minters
   require {
     r11: is_not_paused();
-    r12: expiration > now 
+    r12: expiration > now;
+    r13: iamount > 0;
+    r14: rate > 0
    }
   effect {
     // add expiration date
@@ -584,15 +586,21 @@ entry mint (itokenid : nat, rate : rational, iamount : nat, expiration: date, cu
 */
 entry burn(itokenid : nat, iamount : nat) {
   called by minters
-  require { r2 : is_not_paused() }
+  require {
+    r2 : is_not_paused()
+
+  }
   effect {
     if (ledger.contains((itokenid, caller))) then
     begin
       var vamount = ledger[(itokenid, caller)].lamount;
       if (vamount > iamount)
       then ledger.update((itokenid, caller), { lamount -= iamount })
-      else if (vamount = iamount)
-        then ledger.remove((itokenid, caller))
+      else if (vamount = iamount) then 
+      begin
+        ledger.remove((itokenid, caller));
+        token_metadata.remove(itokenid)
+      end
         else fail(FA2_INSUFFICIENT_BALANCE);
     end
     else
