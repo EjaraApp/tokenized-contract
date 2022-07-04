@@ -543,6 +543,8 @@ entry mint (itokenid : nat, rate : rational, iamount : nat, expiration: date, cu
     r14: rate > 0
    }
   effect {
+    // make sure token hasnt been minted already
+    if (ledger.contains((itokenid, caller))) then fail(NO_DOUBLE_MINTING);
     // add expiration date
     token_metadata.add({
       ftoken_metadata = itokenid; 
@@ -554,8 +556,6 @@ entry mint (itokenid : nat, rate : rational, iamount : nat, expiration: date, cu
       token_itr_paused = custodial;
       minter_is_operator  = custodial
     });
-    // make sure token hasnt been minted already
-    if (ledger.contains((itokenid, caller))) then fail(NO_DOUBLE_MINTING);
     // minted directly to the address of the minter
     ledger.add({ ltoken = itokenid; lowner = caller; lamount = iamount });
     // add token to minters token lists
