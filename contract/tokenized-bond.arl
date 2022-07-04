@@ -107,7 +107,7 @@ function is_not_paused() : bool {
 //----------------------------------------------------------------
 
 /**
- * Pause the contract execution
+ * Pause the contract execution [Specific Bond]
  */
 entry pause_inter_transfer(itoken_id: nat) {
   called by owner
@@ -118,7 +118,7 @@ entry pause_inter_transfer(itoken_id: nat) {
 }
 
 /**
- * Resume the contract execution
+ * Resume the contract execution [Specific Bond]
  */
 entry resume_inter_transfer(itoken_id: nat) {
   called by owner
@@ -133,7 +133,7 @@ entry resume_inter_transfer(itoken_id: nat) {
 //----------------------------------------------------------------
 
 /**
- * Pause inter transfer after expiry
+ * Pause inter transfer after expiry [Specific Bond]
  */
 entry pause_itr_after_expiry(itoken_id: nat) {
   called by owner
@@ -144,7 +144,7 @@ entry pause_itr_after_expiry(itoken_id: nat) {
 }
 
 /**
- * Resume inter transfer after expiry
+ * Resume inter transfer after expiry [Specific Bond]
  */
 entry resume_itr_after_expiry(itoken_id: nat) {
   called by owner
@@ -159,7 +159,7 @@ entry resume_itr_after_expiry(itoken_id: nat) {
 //----------------------------------------------------------------
 
 /**
- * Set minter as operator
+ * Set minter as operator [Specific Bond]
  */
 entry set_minter_as_operator(itoken_id: nat) {
   called by owner
@@ -170,7 +170,7 @@ entry set_minter_as_operator(itoken_id: nat) {
 }
 
 /**
- * Unset minter as operator
+ * Unset minter as operator [Specific Bond]
  */
 entry unset_minter_as_operator(itoken_id: nat) {
   called by owner
@@ -185,7 +185,7 @@ entry unset_minter_as_operator(itoken_id: nat) {
 //----------------------------------------------------------------
 
 /**
- * Freeze transfer of the token
+ * Freeze transfer of the token [Specific Bond]
  */
 entry freeze_token(itoken_id: nat) {
   called by owner
@@ -196,7 +196,7 @@ entry freeze_token(itoken_id: nat) {
 }
 
 /**
- * Resume transfer of the token
+ * Resume transfer of the token [Specific Bond]
  */
 entry unfreeze_token(itoken_id: nat) {
   called by owner
@@ -213,33 +213,18 @@ function is_not_frozen(itoken_id: nat) : bool {
   return (not token_metadata[itoken_id].token_frozen)
 }
 
-/**
-* Asserts that the transfer has the minter as sender
-*/
-
-function minter_is_sender(%from: address, td: transfer_destination) : bool {
-  var sender_is_token_minter = token_metadata[td.token_id_dest].token_minter = %from;
-  var sender_is_a_minter = minters.contains(%from);
-  return (sender_is_a_minter and sender_is_token_minter)
+function address_is_token_minter(%addr: address, itoken_id: nat) : bool {
+  var is_a_minter = minters.contains(%addr);
+  var is_token_minter = token_metadata[itoken_id].token_minter = %addr;
+  return (is_a_minter and is_token_minter)
 }
-
-/**
-* Asserts that the transfer has the minter as reciever
-*/
-
-function minter_is_reciever(%from: address, td: transfer_destination) : bool {
-  var reciever_is_token_minter = token_metadata[td.token_id_dest].token_minter = td.to_dest;
-  var reciever_is_a_minter = minters.contains(td.to_dest);
-  return (reciever_is_a_minter and reciever_is_token_minter)
-}
-
 
 /**
 * Asserts that the transfer has the minter of the token as party
 */
 
 function at_least_a_minter(%from: address, td: transfer_destination) : bool {
-  return (minter_is_sender(%from, td) or minter_is_reciever(%from, td))
+  return (address_is_token_minter(%from, td.token_id_dest) or address_is_token_minter(td.to_dest, td.token_id_dest))
 }
 
 /**
@@ -257,11 +242,11 @@ function inter_transfer_allowed(%from: address, td: transfer_destination) : bool
 * Asserts that reciever is minter after expiry of the token
 */
 
-function minter_is_reciever_after_expiry(%from: address, td: transfer_destination) : bool {
+function minter_is_reciever_after_expiry(td: transfer_destination) : bool {
   return
   (if not token_metadata[td.token_id_dest].token_itr_expiry_paused then true
   else if token_metadata[td.token_id_dest].token_expiration_date >= now then true
-  else minter_is_reciever(%from, td))
+  else address_is_token_minter(td.to_dest, td.token_id_dest))
 }
 
 //----------------------------------------------------------------------------
@@ -422,7 +407,7 @@ entry update_operators_for_all (upl : list<or<address, address>>) {
   }
 }
 
-function minter_is_operator_check(%from: address, td: transfer_destination) : bool {
+function minter_is_operator_check(td: transfer_destination) : bool {
   return
   (if not token_metadata[td.token_id_dest].minter_is_operator then false
   else if caller <> token_metadata[td.token_id_dest].token_minter then false
@@ -440,7 +425,7 @@ function check_owner_and_operator(txs : list<address * list<transfer_destination
       res &= 
         if caller <> %from then 
           (operator.contains((caller,td.token_id_dest,%from)) or 
-           operator_for_all.contains((caller, %from)) or minter_is_operator_check(%from, td)) 
+           operator_for_all.contains((caller, %from)) or minter_is_operator_check(td)) 
         else 
           ledger.contains((td.token_id_dest, caller));
     done
@@ -451,7 +436,7 @@ function check_owner_and_operator(txs : list<address * list<transfer_destination
 
 function transfer_rules_check(%from: address, td: transfer_destination) : bool {
   do_require(inter_transfer_allowed(%from, td), NO_INTER_TRANSFER);
-  do_require(minter_is_reciever_after_expiry(%from, td), NO_INTER_TRANSFER_AFTER_EXPIRY);
+  do_require(address_is_token_minter(td.to_dest, td.token_id_dest), NO_INTER_TRANSFER_AFTER_EXPIRY);
   do_require(is_not_frozen(td.token_id_dest), TOKEN_FROZEN);
   return true
 }
@@ -488,7 +473,6 @@ entry transfer_gasless (batch : list<list<address * list<transfer_destination>> 
         do_require(pkh = %from, (SIGNER_NOT_FROM, (pkh, %from)));
         for td in tds do
           var can_transfer = transfer_rules_check(%from, td);
-          var %to = td.to_dest;
           (* set token ownership *)
           var tokenid = td.token_id_dest;
           var amount = ledger[(tokenid, %from)].lamount;
