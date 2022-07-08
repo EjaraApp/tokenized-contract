@@ -56,9 +56,14 @@ entry transfer_ownership(candidate : address) {
 * Note: fails if caller is not declared candidate
 */
 entry accept_ownership() {
-  called by get_some(owner_candidate)
+  constant {
+    new_owner ?is owner_candidate otherwise "NO_CANDIDATE"
+  }
+  require {
+    rw: caller = new_owner otherwise "INVALID_CALLER"
+  }
   effect {
-    owner := get_some(owner_candidate);
+    owner := new_owner;
     owner_candidate := none
   }
 }
@@ -441,6 +446,23 @@ function transfer_rules_check(%from: address, td: transfer_destination) : bool {
   return true
 }
 
+function make_transfers(%from: address, tds : list<transfer_destination>) : unit {
+    for td in tds do
+      const can_transfer = transfer_rules_check(%from, td);
+      (* set token ownership *)
+      var tokenid = td.token_id_dest;
+      var amount = ledger[(tokenid, %from)].lamount;
+      if td.token_amount_dest > amount then
+        fail(FA2_INSUFFICIENT_BALANCE)
+      else if td.token_amount_dest = amount then
+        ledger.remove((tokenid, %from))
+      else
+        ledger.update((tokenid, %from), { lamount -= td.token_amount_dest });
+      ledger.add_update((tokenid, td.to_dest), { lamount += td.token_amount_dest })
+    done;
+    return Unit
+}
+
 //----------------------------------------------------------------------------
 // Feeless transfer (one step, )
 //----------------------------------------------------------------------------
@@ -471,19 +493,7 @@ entry transfer_gasless (batch : list<list<address * list<transfer_destination>> 
         var %from = tx[0];
         var tds = tx[1];
         do_require(pkh = %from, (SIGNER_NOT_FROM, (pkh, %from)));
-        for td in tds do
-          var can_transfer = transfer_rules_check(%from, td);
-          (* set token ownership *)
-          var tokenid = td.token_id_dest;
-          var amount = ledger[(tokenid, %from)].lamount;
-          if td.token_amount_dest > amount then
-            fail(FA2_INSUFFICIENT_BALANCE)
-          else if td.token_amount_dest = amount then
-            ledger.remove((tokenid, %from))
-          else
-            ledger.update((tokenid, %from), { lamount -= td.token_amount_dest });
-          ledger.add_update((tokenid, td.to_dest), { lamount += td.token_amount_dest })
-        done;
+        const trans = make_transfers(%from, tds)
       done
     done
   }
@@ -506,19 +516,7 @@ entry %transfer (txs : list<address * list<transfer_destination>>) {
     for tx in txs do
       var %from = tx[0];
       var tds = tx[1];
-      for td in tds do
-        var can_transfer = transfer_rules_check(%from, td);
-        (* set token ownership *)
-        var tokenid = td.token_id_dest;
-        var amount = ledger[(tokenid, %from)].lamount;
-        if td.token_amount_dest > amount then
-          fail(FA2_INSUFFICIENT_BALANCE)
-        else if td.token_amount_dest = amount then
-          ledger.remove((tokenid, %from))
-        else
-          ledger.update((tokenid, %from), { lamount -= td.token_amount_dest });
-        ledger.add_update((tokenid, td.to_dest), { lamount += td.token_amount_dest })
-      done;
+      const trans = make_transfers(%from, tds)
     done
   }
 }
