@@ -18,9 +18,6 @@ constant FA2_INVALID_AMOUNT                      : string = "FA2_INVALID_AMOUNT"
 constant FA2_NOT_OPERATOR                        : string = "FA2_NOT_OPERATOR"
 constant MISSIGNED                               : string = "MISSIGNED"
 constant NO_ENTRY_FOR_USER                       : string = "NO_ENTRY_FOR_USER"
-constant PERMIT_EXPIRED                          : string = "PERMIT_EXPIRED"
-constant PERMIT_NOT_FOUND                        : string = "PERMIT_NOT_FOUND"
-constant PERMIT_USER_NOT_FOUND                   : string = "PERMIT_USER_NOT_FOUND"
 constant SIGNER_NOT_FROM                         : string = "SIGNER_NOT_FROM"
 constant NO_DOUBLE_MINTING                       : string = "TOKEN_ID_ALREADY_MINTED"
 constant NO_INTER_TRANSFER                       : string = "NO_INTER_TRANSFER"
@@ -260,7 +257,6 @@ function minter_is_reciever_after_expiry(td: transfer_destination) : bool {
 
 entry set_metadata(ikey: string, idata : bytes) {
   called by owner
-  require { r3 : is_not_paused() }
   effect {
     metadata := put(metadata, ikey, idata)
   }
@@ -277,7 +273,6 @@ asset minters identified by minter {
 
 entry add_minter(aminter: address) {
   called by owner
-  require { r9: is_not_paused() }
   effect {
     minters.add_update(aminter, {})
   }
@@ -286,7 +281,6 @@ entry add_minter(aminter: address) {
 entry replace_minter(ominter: address, nminter: address) {
   called by owner
   require { 
-    r10: is_not_paused();
     ominter_exists: minters.contains(ominter);
     nminter_does_not_exist: not minters.contains(nminter);
   }
@@ -316,7 +310,6 @@ asset operator identified by oaddr otoken oowner to big_map {
   oaddr       : address;
   otoken      : nat;
   oowner      : address;
-  ounit       : unit = Unit;
 }
 
 asset token_metadata to big_map {
@@ -354,16 +347,9 @@ record balance_of_response {
   balance_ : nat;
 } as ((request, balance))
 
-
-asset permits to big_map {
-  user_address : address;
-  counter      : nat = 0;
-}
-
 asset operator_for_all identified by fa_oaddr fa_oowner to big_map {
   fa_oaddr    : address;
   fa_oowner   : address;
-  fa_empty    : unit = Unit;
 }
 
 //----------------------------------------------------------------------------
@@ -381,10 +367,10 @@ entry update_operators (upl : list<or<operator_param, operator_param>>) {
       match up with
       | left(param)  -> (* add *)
         do_require(param.opp_owner = caller , CALLER_NOT_OWNER);
-        operator.add({
-          oaddr  = param.opp_operator; 
-          otoken = param.opp_token_id; 
-          oowner = param.opp_owner
+        operator.put({
+          param.opp_operator; 
+          param.opp_token_id; 
+          param.opp_owner
         })
       | right(param) -> (* remove *)
         do_require(param.opp_owner = caller , CALLER_NOT_OWNER);
@@ -404,7 +390,7 @@ entry update_operators_for_all (upl : list<or<address, address>>) {
     for up in upl do
       match up with
       | left(op)  -> (* add *)
-        operator_for_all.add({fa_oaddr = op; fa_oowner = caller})
+        operator_for_all.put({op; caller})
       | right(op) -> (* remove *)
         operator_for_all.remove((op, caller))
       end;
@@ -446,7 +432,9 @@ function transfer_rules_check(%from: address, td: transfer_destination) : bool {
   return true
 }
 
-function make_transfers(%from: address, tds : list<transfer_destination>) : unit {
+entry make_transfer(%from: address, tds : list<transfer_destination>) {
+  called by self_address
+  effect {
     for td in tds do
       const can_transfer = transfer_rules_check(%from, td);
       (* set token ownership *)
@@ -460,42 +448,6 @@ function make_transfers(%from: address, tds : list<transfer_destination>) : unit
         ledger.update((tokenid, %from), { lamount -= td.token_amount_dest });
       ledger.add_update((tokenid, td.to_dest), { lamount += td.token_amount_dest })
     done;
-    return Unit
-}
-
-//----------------------------------------------------------------------------
-// Feeless transfer (one step, )
-//----------------------------------------------------------------------------
-
-/**
-* Transfers tokens with permits 
-* @param batch list of pairs of permits (key and signature) and transfer specification
-* Note: pk public key that signed 
-* Note: signature contract address * chain id * counter * data
-* Note: counter is to prevent replay attack
-* Note: a transfer specification is a list of pairs of 'from' address and transfer destination
-* Note: a transfer destination has a 'to' address, a token id and an amount
-*/ 
-entry transfer_gasless (batch : list<list<address * list<transfer_destination>> * (key * signature)>) {
-  require { r8 : is_not_paused() }
-  effect {
-    for b in batch do
-      var pk  = b[1][0];
-      var sig = b[1][1];
-      var pkh = key_to_address(pk);
-
-      var lcounter = if permits.contains(pkh) then permits[pkh].counter else 0;
-      var data : bytes = pack((self_address, lcounter, blake2b(pack(b[0]))));
-      if not check_signature(pk, sig, data) then fail((MISSIGNED, data));
-      permits.add_update(pkh, { counter = (lcounter + 1)});
-
-      for tx in b[0] do
-        var %from = tx[0];
-        var tds = tx[1];
-        do_require(pkh = %from, (SIGNER_NOT_FROM, (pkh, %from)));
-        const trans = make_transfers(%from, tds)
-      done
-    done
   }
 }
 
@@ -503,7 +455,6 @@ entry transfer_gasless (batch : list<list<address * list<transfer_destination>> 
 * Transfers tokens
 * @param txs list of pairs of 'from' address and transfer destination
 * Note : a transfer destination has a 'to' address, a token id and an amount
-* Note : if caller is not 'from' nor operator, it checks if there is a permit
 */
 entry %transfer (txs : list<address * list<transfer_destination>>) {
   require { r4 : is_not_paused() }
@@ -516,7 +467,7 @@ entry %transfer (txs : list<address * list<transfer_destination>>) {
     for tx in txs do
       var %from = tx[0];
       var tds = tx[1];
-      const trans = make_transfers(%from, tds)
+      transfer 0tz to entry self.make_transfer(%from, tds);
     done
   }
 }
@@ -569,8 +520,8 @@ entry mint (itokenid : nat, rate : rational, iamount : nat, expiration: date, cu
 entry burn(itokenid : nat, iamount : nat) {
   called by minters
   require {
-    r2 : is_not_paused()
-
+    r2 : is_not_paused();
+    r15: iamount > 0;
   }
   effect {
     if (ledger.contains((itokenid, caller))) then
