@@ -1,9 +1,20 @@
-import { deploy, getAccount, getValueFromBigMap, setQuiet, expectToThrow, exprMichelineToJson, setMockupNow, getEndpoint, isMockup, setEndpoint } from '@completium/completium-cli';
-import { errors, mkTransferPermit, mkApproveForAllSingle, mkDeleteApproveForAllSingle, mkTransferGaslessArgs } from './utils';
-import assert from 'assert';
+const {
+    deploy,
+    getAccount,
+    getValueFromBigMap,
+    setQuiet,
+    expectToThrow,
+    exprMichelineToJson,
+    setMockupNow,
+    getEndpoint,
+    isMockup,
+    setEndpoint
+} = require('@completium/completium-cli');
+const { errors, mkTransferPermit, mkApproveForAllSingle, mkDeleteApproveForAllSingle, mkTransferGaslessArgs } = require('./utils');
+const assert = require('assert');
 
-import 'mocha/package.json';
-import mochaLogger from 'mocha-logger';
+require('mocha/package.json');
+const mochaLogger = require('mocha-logger');
 
 setQuiet('true');
 
@@ -47,7 +58,7 @@ async function expectToThrowMissigned(f, e) {
 describe('[Tokenized Bond] Contract deployment', async () => {
     it('TB private collection contract deployment should succeed', async () => {
         [tb, _] = await deploy(
-            './contract/tokenized-bond.arl',
+            '../contract/tokenized-bond.arl',
             {
                 parameters: {
                     owner: ama.pkh,
