@@ -30,6 +30,11 @@ constant TOKEN_FROZEN                            : string = "TOKEN_FROZEN"
 constant TOKEN_NOT_FROZEN                        : string = "TOKEN_NOT_FROZEN"
 constant MINTER_IS_OPERATOR                      : string = "MINTER_IS_OPERATOR"
 constant MINTER_IS_NOT_OPERATOR                  : string = "MINTER_IS_NOT_OPERATOR"
+constant MINT_DATE_LOWER                         : string = "MINT_DATE_IS_LOWER_THAN_NOW"
+constant MINT_AMOUNT_LOWER                       : string = "MINT_AMOUNT_MUST_BE_GREATER_THAN_ZERO"
+constant MINT_RATE_LOWER                         : string = "MINT_RATE_MUST_BE_GREATER_THAN_ZERO"
+constant OLD_MINTER_NOT_EXIST                    : string = "OLD_MINTER_DOES_NOT_EXIST"
+constant NEW_MINTER_EXIST                       : string = "NEW_MINTER_EXISTS"
 
 //----------------------------------------------------------------------------
 // Owner role transfer
@@ -281,8 +286,8 @@ entry add_minter(aminter: address) {
 entry replace_minter(ominter: address, nminter: address) {
   called by owner
   require { 
-    ominter_exists: minters.contains(ominter);
-    nminter_does_not_exist: not minters.contains(nminter);
+    ominter_exists: minters.contains(ominter) otherwise OLD_MINTER_NOT_EXIST;
+    nminter_does_not_exist: not minters.contains(nminter) otherwise NEW_MINTER_EXIST;
   }
   effect {
     // replace old minter with new minter in all minted tokens
@@ -486,10 +491,10 @@ entry %transfer (txs : list<address * list<transfer_destination>>) {
 entry mint (itokenid : nat, rate : rational, iamount : nat, expiration: date, custodial: bool, itokenMetadata: map<string, bytes>) {
   called by minters
   require {
-    r11: is_not_paused();
-    r12: expiration > now;
-    r13: iamount > 0;
-    r14: rate > 0
+    r11: is_not_paused() otherwise CONTRACT_PAUSED;
+    r12: expiration > now otherwise MINT_DATE_LOWER;
+    r13: iamount > 0 otherwise MINT_AMOUNT_LOWER;
+    r14: rate > 0 otherwise MINT_RATE_LOWER
    }
   effect {
     // make sure token hasnt been minted already
