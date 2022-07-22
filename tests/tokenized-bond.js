@@ -46,10 +46,12 @@ let tokenId = 0;
 let amount = 1000000000;
 let amount2 = 1000000;
 let amount3 = 1000;
+let burnAmount = 100;
 let zero = 0;
 let firstToken = 1;
 let secondToken = 2;
 let thirdToken = 3;
+let invalidToken = 99;
 
 //set endpointhead 
 setEndpoint(mockup_mode ? 'mockup' : 'https://ithacanet.smartpy.io');
@@ -112,6 +114,55 @@ describe('Contract Deployment', async () => {
 });
 
 
+describe('Contract Metadata', async () => {
+
+    it('Set metadata called by not owner should fail', async () => {
+        await expectToThrow(async () => {
+            const argM = `(Pair "key" 0x)`;
+            await tb.set_metadata({
+                argMichelson: argM,
+                as: outsider.pkh,
+            });
+        }, errors.INVALID_CALLER);
+    });
+
+    it('Set metadata with empty content should succeed', async () => {
+        const argM = `(Pair "key" 0x)`;
+        const storage = await tb.getStorage();
+        await tb.set_metadata({
+            argMichelson: argM,
+            as: owner.pkh,
+        });
+        var metadata = await getValueFromBigMap(
+            parseInt(storage.metadata),
+            exprMichelineToJson(`""`),
+            exprMichelineToJson(`string'`)
+        );
+        assert(metadata.bytes == '');
+    });
+
+    it('Set metadata with valid content should succeed', async () => {
+        const bytes =
+            '0x05070707070a00000016016a5569553c34c4bfe352ad21740dea4e2faad3da000a00000004f5f466ab070700000a000000209aabe91d035d02ffb550bb9ea6fe19970f6fb41b5e69459a60b1ae401192a2dc';
+        const argM = `(Pair "" ${bytes})`;
+        const storage = await tb.getStorage();
+
+        await tb.set_metadata({
+            argMichelson: argM,
+            as: owner.pkh,
+        });
+
+        var metadata = await getValueFromBigMap(
+            parseInt(storage.metadata),
+            exprMichelineToJson(`""`),
+            exprMichelineToJson(`string'`)
+        );
+        assert('0x' + metadata.bytes == bytes);
+    });
+
+});
+
+
 describe('Ownership Transfer', async () => {
     it('Transfer ownership as non-owner should fail', async () => {
         await expectToThrow(async () => {
@@ -151,14 +202,14 @@ describe('Ownership Transfer', async () => {
 
     it('Accept ownership as new owner should succeed', async () => {
         let storage = await tb.getStorage();
-        assert(storage.owner_candidate == kofi.pkh);
+        assert(storage.owner_candidate == owner2.pkh);
         await tb.accept_ownership({
-            as: kofi.pkh,
+            as: owner2.pkh,
         });
         storage = await tb.getStorage();
-        assert(storage.owner == kofi.pkh);
+        assert(storage.owner == owner2.pkh);
         assert(storage.owner_candidate == null);
-        owner = kofi;
+        owner = owner2;
     });
 
 });
@@ -306,7 +357,7 @@ describe('Mint', async () => {
                 arg: {
                     itokenid: currentTokenId,
                     rate: [1, 10],
-                    iamount: 0,
+                    iamount: zero,
                     expiration: "2023-03-20T00:00:00Z",
                     custodial: true,
                     itokenMetadata: [{ key: '', value: '0x' }]
@@ -493,6 +544,15 @@ describe('Replace Minter', async () => {
         assert(!storage.minters.has(minter2.pkh));
         assert(storage.minters.has(outsider.pkh));
         const oldMinterTokens = storage.minters.get(outsider.pkh);
+        const oldMinterTokenBalances = {};
+        for (const tokenId of oldMinterTokens) {
+            const balance = await getValueFromBigMap(
+                parseInt(storage.ledger),
+                exprMichelineToJson(`(Pair ${tokenId} "${outsider.pkh}")`),
+                exprMichelineToJson(`(pair nat address)'`)
+            );
+            oldMinterTokenBalances[tokenId] = parseInt(balance.int);
+        }
         await tb.replace_minter({
             arg: {
                 ominter: outsider.pkh,
@@ -513,6 +573,18 @@ describe('Replace Minter', async () => {
                 exprMichelineToJson(`nat'`)
             );
             assert(tMeta.args[1].string == minter2.pkh);
+            const oldBalance = await getValueFromBigMap(
+                parseInt(storage.ledger),
+                exprMichelineToJson(`(Pair ${n} "${outsider.pkh}")`),
+                exprMichelineToJson(`(pair nat address)'`)
+            );
+            assert(oldBalance == null);
+            const newBalance = await getValueFromBigMap(
+                parseInt(storage.ledger),
+                exprMichelineToJson(`(Pair ${n} "${minter2.pkh}")`),
+                exprMichelineToJson(`(pair nat address)'`)
+            );
+            assert(parseInt(newBalance.int) == oldMinterTokenBalances[n]);
         }
     })
 
@@ -827,3 +899,281 @@ describe('Bond Intertransfer after Expiry Pause', async () => {
     })
 
 })
+
+
+describe('Burn Token', async () => {
+    it('Burn as non-minter should fail', async () => {
+        await expectToThrow(async () => {
+            await tb.burn({
+                arg: {
+                    itokenid: thirdToken,
+                    iamount: burnAmount,
+                },
+                as: owner.pkh,
+            });
+        }, errors.INVALID_CALLER);
+    })
+
+    it('Burn in paused mode should fail', async () => {
+        await tb.pause({
+            as: owner.pkh,
+        });
+        await expectToThrow(async () => {
+            await tb.burn({
+                arg: {
+                    itokenid: thirdToken,
+                    iamount: burnAmount,
+                },
+                as: minter2.pkh,
+            });
+        }, errors.CONTRACT_PAUSED);
+        await tb.unpause({
+            as: owner.pkh,
+        });
+    })
+
+    it('Burn amount <= 0 should fail', async () => {
+        await expectToThrow(async () => {
+            await tb.burn({
+                arg: {
+                    itokenid: thirdToken,
+                    iamount: zero,
+                },
+                as: minter2.pkh,
+            });
+        }, errors.BURN_AMOUNT_LOWER);
+    })
+
+    it('Burn amount greater than token amount should fail', async () => {
+        await expectToThrow(async () => {
+            await tb.burn({
+                arg: {
+                    itokenid: thirdToken,
+                    iamount: amount2,
+                },
+                as: minter2.pkh,
+            });
+        }, errors.FA2_INSUFFICIENT_BALANCE);
+    })
+
+    it('Burn with non-existent token should fail', async () => {
+        await expectToThrow(async () => {
+            await tb.burn({
+                arg: {
+                    itokenid: invalidToken,
+                    iamount: amount3,
+                },
+                as: minter2.pkh,
+            });
+        }, errors.FA2_INSUFFICIENT_BALANCE);
+    })
+
+    it('Burn token by non-minter should fail', async () => {
+        await expectToThrow(async () => {
+            await tb.burn({
+                arg: {
+                    itokenid: firstToken,
+                    iamount: amount,
+                },
+                as: minter2.pkh,
+            });
+        }, errors.FA2_INSUFFICIENT_BALANCE);
+    })
+
+    it('Burn token should succeed', async () => {
+        let storage = await tb.getStorage();
+        let balance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${thirdToken} "${minter2.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(balance.int) == amount3);
+        await tb.burn({
+            arg: {
+                itokenid: thirdToken,
+                iamount: burnAmount,
+            },
+            as: minter2.pkh,
+        });
+        amount3 = amount3 - burnAmount;
+        storage = await tb.getStorage();
+        balance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${thirdToken} "${minter2.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(balance.int) == amount3);
+    })
+
+    it('Burn all token should remove token & metadata should succeed ', async () => {
+        let storage = await tb.getStorage();
+        let balance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${thirdToken} "${minter2.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(balance.int) == amount3);
+        let tMeta = await getValueFromBigMap(
+            parseInt(storage.token_metadata),
+            exprMichelineToJson(`${thirdToken}`),
+            exprMichelineToJson(`nat'`)
+        );
+        assert(tMeta != null);
+        await tb.burn({
+            arg: {
+                itokenid: thirdToken,
+                iamount: amount3,
+            },
+            as: minter2.pkh,
+        });
+        storage = await tb.getStorage();
+        balance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${thirdToken} "${minter2.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(balance == null);
+        tMeta = await getValueFromBigMap(
+            parseInt(storage.token_metadata),
+            exprMichelineToJson(`${thirdToken}`),
+            exprMichelineToJson(`nat'`)
+        );
+        assert(tMeta == null);
+    })
+});
+
+describe('Operator', async () => {
+    it('Add an operator for ourself should succeed', async () => {
+        const storage = await tb.getStorage();
+        let initialOperators = await getValueFromBigMap(
+            parseInt(storage.operator),
+            exprMichelineToJson(
+                `(Pair "${tb.address}" (Pair ${firstToken} "${outsider.pkh}"))`
+            ),
+            exprMichelineToJson(`(pair address (pair nat address))'`)
+        );
+        assert(initialOperators == null);
+        await tb.update_operators({
+            argMichelson: `{Left (Pair "${outsider.pkh}" "${tb.address}" ${firstToken})}`,
+            as: outsider.pkh,
+        });
+        let operatorsAfterAdd = await getValueFromBigMap(
+            parseInt(storage.operator),
+            exprMichelineToJson(
+                `(Pair "${tb.address}" (Pair ${firstToken} "${outsider.pkh}"))`
+            ),
+            exprMichelineToJson(`(pair address (pair nat address))'`)
+        );
+        assert(operatorsAfterAdd.prim == 'Unit');
+    });
+
+    it('Remove a non existing operator should succeed', async () => {
+        await tb.update_operators({
+            argMichelson: `{Right (Pair "${outsider.pkh}" "${ama.pkh}" ${firstToken})}`,
+            as: outsider.pkh,
+        });
+    });
+
+    it('Remove an existing operator for another user should fail', async () => {
+        await expectToThrow(async () => {
+            await tb.update_operators({
+                argMichelson: `{Right (Pair "${outsider.pkh}" "${tb.address}" ${firstToken})}`,
+                as: ama.pkh,
+            });
+        }, errors.CALLER_NOT_OWNER);
+    });
+
+    it('Add operator for another user should fail', async () => {
+        await expectToThrow(async () => {
+            await tb.update_operators({
+                argMichelson: `{Left (Pair "${owner.pkh}" "${tb.address}" ${firstToken})}`,
+                as: outsider.pkh,
+            });
+        }, errors.CALLER_NOT_OWNER);
+    });
+
+    it('Remove an existing operator should succeed', async () => {
+        const storage = await tb.getStorage();
+        var initialOperators = await getValueFromBigMap(
+            parseInt(storage.operator),
+            exprMichelineToJson(
+                `(Pair "${tb.address}" (Pair ${firstToken} "${outsider.pkh}"))`
+            ),
+            exprMichelineToJson(`(pair address (pair nat address))'`)
+        );
+        assert(initialOperators.prim == 'Unit');
+        await tb.update_operators({
+            argMichelson: `{Right (Pair "${outsider.pkh}" "${tb.address}" ${firstToken})}`,
+            as: outsider.pkh,
+        });
+        var operatorsAfterRemoval = await getValueFromBigMap(
+            parseInt(storage.operator),
+            exprMichelineToJson(
+                `(Pair "${tb.address}" (Pair ${firstToken} "${outsider.pkh}"))`
+            ),
+            exprMichelineToJson(`(pair address (pair nat address))'`)
+        );
+        assert(operatorsAfterRemoval == null);
+    });
+
+});
+
+
+describe('Operator for All', async () => {
+    it('Add an operator for all for ourself should succeed', async () => {
+        const storage = await tb.getStorage();
+        var initialOperators = await getValueFromBigMap(
+            parseInt(storage.operator_for_all),
+            exprMichelineToJson(
+                `(Pair "${tb.address}" "${outsider.pkh}"))`
+            ),
+            exprMichelineToJson(`(pair address address)'`)
+        );
+        assert(initialOperators == null);
+        await tb.update_operators_for_all({
+            argJsonMichelson: mkApproveForAllSingle(tb.address),
+            as: outsider.pkh
+        });
+        var operatorsAfterAdd = await getValueFromBigMap(
+            parseInt(storage.operator_for_all),
+            exprMichelineToJson(
+                `(Pair "${tb.address}" "${outsider.pkh}")`
+            ),
+            exprMichelineToJson(`(pair address address)'`)
+        );
+        assert(operatorsAfterAdd.prim == 'Unit');
+    });
+
+    it('Remove a non existing operator should succeed', async () => {
+        await tb.update_operators_for_all({
+            argJsonMichelson: mkDeleteApproveForAllSingle(ama.pkh),
+            as: outsider.pkh
+        });
+    });
+
+    it('Remove an existing operator should succeed', async () => {
+        const storage = await tb.getStorage();
+        var initialOperators = await getValueFromBigMap(
+            parseInt(storage.operator_for_all),
+            exprMichelineToJson(
+                `(Pair "${tb.address}" "${outsider.pkh}")`
+            ),
+            exprMichelineToJson(`(pair address address)'`)
+        );
+        assert(initialOperators.prim == "Unit");
+        await tb.update_operators_for_all({
+            argJsonMichelson: mkDeleteApproveForAllSingle(tb.address),
+            as: outsider.pkh
+        });
+        var operatorsAfterRemoval = await getValueFromBigMap(
+            parseInt(storage.operator_for_all),
+            exprMichelineToJson(
+                `(Pair "${tb.address}" "${outsider.pkh}")`
+            ),
+            exprMichelineToJson(`(pair address address)'`)
+        );
+        assert(operatorsAfterRemoval == null);
+    });
+
+
+});

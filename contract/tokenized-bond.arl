@@ -32,6 +32,7 @@ constant MINTER_IS_OPERATOR                      : string = "MINTER_IS_OPERATOR"
 constant MINTER_IS_NOT_OPERATOR                  : string = "MINTER_IS_NOT_OPERATOR"
 constant MINT_DATE_LOWER                         : string = "MINT_DATE_IS_LOWER_THAN_NOW"
 constant MINT_AMOUNT_LOWER                       : string = "MINT_AMOUNT_MUST_BE_GREATER_THAN_ZERO"
+constant BURN_AMOUNT_LOWER                       : string = "BURN_AMOUNT_MUST_BE_GREATER_THAN_ZERO"
 constant MINT_RATE_LOWER                         : string = "MINT_RATE_MUST_BE_GREATER_THAN_ZERO"
 constant OLD_MINTER_NOT_EXIST                    : string = "OLD_MINTER_DOES_NOT_EXIST"
 constant NEW_MINTER_EXIST                       : string = "NEW_MINTER_EXISTS"
@@ -292,7 +293,11 @@ entry replace_minter(ominter: address, nminter: address) {
   effect {
     // replace old minter with new minter in all minted tokens
     for tk in minters[ominter].tokens_minted do
-      token_metadata.update(tk, {token_minter = nminter})
+      token_metadata.update(tk, {token_minter = nminter});
+      // transfer balance of old minter to new minter
+      const obal = ledger[(tk, ominter)].lamount; // old minter balance
+      ledger.add({ ltoken = tk; lowner = nminter; lamount = obal }); // set as new minter balance
+      ledger.remove((tk, ominter)); // remove old token from old minter
     done;
     // add new minter
     minters.add_update(nminter, { tokens_minted = minters[ominter].tokens_minted });
@@ -491,7 +496,7 @@ entry %transfer (txs : list<address * list<transfer_destination>>) {
 entry mint (itokenid : nat, rate : rational, iamount : nat, expiration: date, custodial: bool, itokenMetadata: map<string, bytes>) {
   called by minters
   require {
-    r11: is_not_paused() otherwise CONTRACT_PAUSED;
+    r11: is_not_paused();
     r12: expiration > now otherwise MINT_DATE_LOWER;
     r13: iamount > 0 otherwise MINT_AMOUNT_LOWER;
     r14: rate > 0 otherwise MINT_RATE_LOWER
@@ -526,7 +531,7 @@ entry burn(itokenid : nat, iamount : nat) {
   called by minters
   require {
     r2 : is_not_paused();
-    r15: iamount > 0;
+    r15: iamount > 0 otherwise BURN_AMOUNT_LOWER;
   }
   effect {
     if (ledger.contains((itokenid, caller))) then
