@@ -252,8 +252,8 @@ function inter_transfer_allowed(%from: address, td: transfer_destination) : bool
 
 function minter_is_reciever_after_expiry(td: transfer_destination) : bool {
   return
-  (if not token_metadata[td.token_id_dest].token_itr_expiry_paused then true
-  else if token_metadata[td.token_id_dest].token_expiration_date >= now then true
+  (if token_metadata[td.token_id_dest].token_expiration_date >= now then true
+  else if not token_metadata[td.token_id_dest].token_itr_expiry_paused then true
   else address_is_token_minter(td.to_dest, td.token_id_dest))
 }
 
@@ -436,9 +436,9 @@ function check_owner_and_operator(txs : list<address * list<transfer_destination
 
 
 function transfer_rules_check(%from: address, td: transfer_destination) : bool {
-  do_require(inter_transfer_allowed(%from, td), NO_INTER_TRANSFER);
-  do_require(address_is_token_minter(td.to_dest, td.token_id_dest), NO_INTER_TRANSFER_AFTER_EXPIRY);
+  do_require(minter_is_reciever_after_expiry(td), NO_INTER_TRANSFER_AFTER_EXPIRY);
   do_require(is_not_frozen(td.token_id_dest), TOKEN_FROZEN);
+  do_require(inter_transfer_allowed(%from, td), NO_INTER_TRANSFER);
   return true
 }
 
