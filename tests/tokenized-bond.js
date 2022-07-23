@@ -17,7 +17,7 @@ const assert = require('assert');
 require('mocha/package.json');
 const mochaLogger = require('mocha-logger');
 
-setQuiet('true');
+setQuiet('false');
 
 const mockup_mode = true;
 
@@ -47,6 +47,8 @@ let amount = 1000000000;
 let amount2 = 1000000;
 let amount3 = 1000;
 let burnAmount = 100;
+let amaAmount = 9999;
+let outsiderAmount = 1000;
 let zero = 0;
 let firstToken = 1;
 let secondToken = 2;
@@ -501,6 +503,317 @@ describe('Mint', async () => {
         }, errors.NO_DOUBLE_MINTING)
     });
 });
+
+
+describe('Transfer', async () => {
+    it('Transfer a token not owned should fail', async () => {
+        await expectToThrow(async () => {
+            await tb.transfer({
+                arg: {
+                    txs: [[ama.pkh, [[outsider.pkh, [firstToken, amount]]]]],
+                },
+                as: ama.pkh,
+            });
+        }, errors.FA2_NOT_OPERATOR);
+    });
+
+    it('Transfer a token from another user without being operator should fail', async () => {
+        await expectToThrow(async () => {
+            await tb.transfer({
+                arg: {
+                    txs: [[ama.pkh, [[outsider.pkh, [firstToken, 1]]]]],
+                },
+                as: outsider.pkh,
+            });
+        }, errors.FA2_NOT_OPERATOR);
+    });
+
+    it('Transfer more tokens than owned should fail', async () => {
+        await expectToThrow(async () => {
+            await tb.transfer({
+                arg: {
+                    txs: [[minter1.pkh, [[outsider.pkh, [firstToken, amount + 1]]]]],
+                },
+                as: minter1.pkh,
+            });
+        }, errors.FA2_INSUFFICIENT_BALANCE);
+    });
+
+    it('Transfer tokens whilst contract paused should fail', async () => {
+        await tb.pause({
+            as: owner.pkh,
+        });
+        await expectToThrow(async () => {
+            await tb.transfer({
+                arg: {
+                    txs: [[minter1.pkh, [[outsider.pkh, [firstToken, 1]]]]],
+                },
+                as: minter1.pkh,
+            });
+        }, errors.CONTRACT_PAUSED);
+        await tb.unpause({
+            as: owner.pkh,
+        });
+    });
+
+    it('Transfer tokens whilst token frozen should fail', async () => {
+        await tb.freeze_token({
+            argMichelson: `${firstToken}`,
+            as: owner.pkh,
+        });
+        await expectToThrow(async () => {
+            await tb.transfer({
+                arg: {
+                    txs: [[minter1.pkh, [[outsider.pkh, [firstToken, 1]]]]],
+                },
+                as: minter1.pkh,
+            });
+        }, errors.TOKEN_FROZEN);
+        await tb.unfreeze_token({
+            argMichelson: `${firstToken}`,
+            as: owner.pkh,
+        });
+    });
+
+    it('Transfer a token should succeed', async () => {
+        let storage = await tb.getStorage();
+        let balance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${firstToken} "${minter1.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(balance.int) == amount)
+
+
+        await tb.transfer({
+            arg: {
+                txs: [
+                    [minter1.pkh, [[outsider.pkh, [firstToken, outsiderAmount]]]],
+                    [minter1.pkh, [[ama.pkh, [firstToken, amaAmount]]]]
+                ],
+            },
+            as: minter1.pkh,
+        });
+        amount = amount - amaAmount - outsiderAmount;
+        storage = await tb.getStorage();
+        balance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${firstToken} "${minter1.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(balance.int) == amount)
+        let outsiderBalance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${firstToken} "${outsider.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(outsiderBalance.int) == outsiderAmount)
+        let amaBalance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${firstToken} "${ama.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(amaBalance.int) == amaAmount)
+
+        storage = await tb.getStorage();
+        outsiderBalance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${firstToken} "${outsider.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(outsiderBalance.int) == outsiderAmount)
+        await tb.transfer({
+            arg: {
+                txs: [
+                    [outsider.pkh, [[minter1.pkh, [firstToken, outsiderAmount]]]],
+                ],
+            },
+            as: outsider.pkh,
+        });
+        amount = amount + outsiderAmount;
+        outsiderBalance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${firstToken} "${outsider.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(outsiderBalance == null);
+
+        await tb.transfer({
+            arg: {
+                txs: [
+                    [minter1.pkh, [[outsider.pkh, [firstToken, outsiderAmount]]]],
+                    [minter1.pkh, [[ama.pkh, [firstToken, amaAmount]]]]
+                ],
+            },
+            as: minter1.pkh,
+        });
+        amount = amount - amaAmount - outsiderAmount;
+        storage = await tb.getStorage();
+        balance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${firstToken} "${minter1.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(balance.int) == amount)
+        outsiderBalance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${firstToken} "${outsider.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(outsiderBalance.int) == outsiderAmount)
+        amaBalance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${firstToken} "${ama.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(amaBalance.int) == amaAmount * 2)
+    });
+
+    it('Transfer tokens between casual holders with intertransfer-false should fail', async () => {
+        await expectToThrow(async () => {
+            await tb.transfer({
+                arg: {
+                    txs: [[ama.pkh, [[outsider.pkh, [firstToken, 1]]]]],
+                },
+                as: ama.pkh,
+            });
+        }, errors.NO_INTER_TRANSFER);
+    });
+
+    it('Transfer tokens between casual holders with intertransfer-true should succeed', async () => {
+        let storage = await tb.getStorage();
+        let outsiderBalance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${firstToken} "${outsider.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(outsiderBalance.int) == outsiderAmount)
+        await tb.resume_inter_transfer({
+            argMichelson: `${firstToken}`,
+            as: owner.pkh,
+        });
+        await tb.transfer({
+            arg: {
+                txs: [
+                    [outsider.pkh, [[ama.pkh, [firstToken, 1]]]],
+                ],
+            },
+            as: outsider.pkh,
+        });
+        outsiderAmount = outsiderAmount - 1;
+        outsiderBalance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${firstToken} "${outsider.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(outsiderBalance.int) == outsiderAmount)
+    });
+
+    it('Transfer tokens between casual holders with intertransfer-expiry-false after expiry should fail', async () => {
+        if (mockup_mode) {
+            const d = new Date();
+            d.setFullYear(2030);
+            setMockupNow(d)
+        }
+        await expectToThrow(async () => {
+            await tb.transfer({
+                arg: {
+                    txs: [[ama.pkh, [[outsider.pkh, [firstToken, 1]]]]],
+                },
+                as: ama.pkh,
+            });
+        }, errors.NO_INTER_TRANSFER_AFTER_EXPIRY);
+    });
+
+    it('Transfer tokens between casual holders with intertransfer-expiry-true should succeed', async () => {
+        let storage = await tb.getStorage();
+        let outsiderBalance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${firstToken} "${outsider.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(outsiderBalance.int) == outsiderAmount)
+        await tb.resume_itr_after_expiry({
+            argMichelson: `${firstToken}`,
+            as: owner.pkh,
+        });
+        await tb.transfer({
+            arg: {
+                txs: [
+                    [outsider.pkh, [[ama.pkh, [firstToken, 1]]]],
+                ],
+            },
+            as: outsider.pkh,
+        });
+        outsiderAmount = outsiderAmount - 1;
+        outsiderBalance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${firstToken} "${outsider.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(outsiderBalance.int) == outsiderAmount)
+        await tb.pause_itr_after_expiry({
+            argMichelson: `${firstToken}`,
+            as: owner.pkh,
+        });
+        await tb.pause_inter_transfer({
+            argMichelson: `${firstToken}`,
+            as: owner.pkh,
+        });
+        if (mockup_mode) {
+            const now = Date.now() / 1000
+            setMockupNow(now)
+        }
+    });
+
+    it('Transfer tokens by minter on behalf of holder with minter not operator should fail', async () => {
+        await tb.unset_minter_as_operator({
+            argMichelson: `${firstToken}`,
+            as: owner.pkh,
+        });
+        await expectToThrow(async () => {
+            await tb.transfer({
+                arg: {
+                    txs: [
+                        [outsider.pkh, [[minter1.pkh, [firstToken, 1]]]],
+                    ],
+                },
+                as: minter1.pkh,
+            });
+        }, errors.FA2_NOT_OPERATOR);
+        await tb.set_minter_as_operator({
+            argMichelson: `${firstToken}`,
+            as: owner.pkh,
+        });
+    });
+
+    it('Transfer tokens by minter on behalf of holder with minter as operator should succeed', async () => {
+        let storage = await tb.getStorage();
+        let balance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${firstToken} "${outsider.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(balance.int) == outsiderAmount)
+        await tb.transfer({
+            arg: {
+                txs: [
+                    [outsider.pkh, [[minter1.pkh, [firstToken, 1]]]],
+                ],
+            },
+            as: minter1.pkh,
+        });
+        outsiderAmount = outsiderAmount -  1;
+        storage = await tb.getStorage();
+        balance = await getValueFromBigMap(
+            parseInt(storage.ledger),
+            exprMichelineToJson(`(Pair ${firstToken} "${outsider.pkh}")`),
+            exprMichelineToJson(`(pair nat address)'`)
+        );
+        assert(parseInt(balance.int) == outsiderAmount)
+    });
+
+})
 
 describe('Replace Minter', async () => {
     it('Replace minter as non-owner should fail', async () => {
@@ -1174,6 +1487,5 @@ describe('Operator for All', async () => {
         );
         assert(operatorsAfterRemoval == null);
     });
-
 
 });
