@@ -8,22 +8,22 @@ The implementation forked and modified this code https://gitlab.com/tezos-paris-
 ## Completium Cli Commands
 
 ### deploy contract
-`completium-cli deploy tokenized-token.arl --parameters '{ "owner" : "tz1UKHNxMwjQs2J2chJxadKz15qpCAZD5YZ1" }' --metadata-storage metadata.json`
+`completium-cli deploy tokenized-bond.arl --parameters '{ "owner" : "tz3cF8X5V6DGBdZCC1hoqLzjtq95BcDvDKqe" }' --metadata-storage metadata.json`
 
 ### add minter
-`completium-cli call tokenized-token --entry add_minter --arg '{"aminter": "tz1Pi9pWrbrya2woZyG6Tja2z7pHFCTVnDQK"}'`
+`completium-cli call tokenized-bond --entry add_minter --arg '{"aminter": "tz1Pi9pWrbrya2woZyG6Tja2z7pHFCTVnDQK"}'`
 
 ### mint bond
-`completium-cli call tokenized-token --entry mint --arg '{"itokenid": 1, "rate": [1, 20], "iamount": 1000000000, "expiration": "2022-03-31T12:00:00Z", custodial: true, "itokenMetadata": [{"key": "", "value": ""}]}'`
+`completium-cli call tokenized-bond --entry mint --arg '{"itokenid": 1, "rate": [1, 20], "iamount": 1000000000, "expiration": "2022-03-31T12:00:00Z", custodial: true, "itokenMetadata": [{"key": "", "value": ""}]}'`
 
 ### transfer
-`completium-cli call tokenized-token --entry transfer --arg '{"txs": [["tz1Pi9pWrbrya2woZyG6Tja2z7pHFCTVnDQK", [["tz1RgtiSzRaYUgVopp_token_idsamm65repNdgXasMxokB9", 1, 1 ]]]]}'`
+`completium-cli call tokenized-bond --entry transfer --arg '{"txs": [["tz1Pi9pWrbrya2woZyG6Tja2z7pHFCTVnDQK", [["tz1RgtiSzRaYUgVsamm65repNdgXasMxokB9", 1, 1 ]]]]}'`
 
 ### set_minter_as_operator
-`completium-cli call tokenized-token --entry set_minter_as_operator --arg '{"itoken_id": 1}'`
+`completium-cli call tokenized-bond --entry set_minter_as_operator --arg '{"itoken_id": 1}'`
 
 ### pause_inter_transfer
-`completium-cli call tokenized-token --entry pause_inter_transfer --arg '{"itoken_id": 1}'`
+`completium-cli call tokenized-bond --entry pause_inter_transfer --arg '{"itoken_id": 1}'`
 
 ## Testnet Deployments
 
@@ -35,7 +35,9 @@ The implementation forked and modified this code https://gitlab.com/tezos-paris-
 
 
 ## Mainnet Deployments
-
+|version | url |
+|--|--|
+|v1.0.0|https://better-call.dev/mainnet/KT1TN1Ja1VYgezMyxBLCVhtZi9QiPcoW7keY|
 
 
 ###### To Do
