@@ -3,6 +3,6 @@
     "version": "1.0.0",
     "homepage": "https://www.ejara.io/",
     "interfaces": [
-        "TZIP-12", "TZIP-16", "TZIP-17"
+        "TZIP-12", "TZIP-16"
     ]
 }

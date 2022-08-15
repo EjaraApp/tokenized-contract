@@ -40,6 +40,7 @@ The implementation forked and modified this code https://gitlab.com/tezos-paris-
 |v1.0.0|https://better-call.dev/mainnet/KT1TN1Ja1VYgezMyxBLCVhtZi9QiPcoW7keY|
 
 
-###### To Do
+### Mainnet Initial Mint
 
-- update tests to reflect changes from forked code.
+### mint bond
+`completium-cli call tokenized-bond --entry mint --arg '{"itokenid": 1, "rate": [13, 20], "iamount": 300000000, "expiration": "2024-07-16T00:00:00Z", "custodial": true, "itokenMetadata": [{"key": "", "value": "68747470733a2f2f746f6b656e697a65642d626f6e642d6173736574732e73332e75732d656173742d322e616d617a6f6e6177732e636f6d2f5444324130303030303632382e6a736f6e"}]}'`

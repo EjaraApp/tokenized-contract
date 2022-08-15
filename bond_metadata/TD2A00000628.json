@@ -1,0 +1,48 @@
+{
+    "name": "Ejara Tokenized Bond",
+    "description": "Once a whole, now split. Together we shall reap profits with a low barrier to entry—a decentralized whole.",
+    "tags": [
+        "tokenization",
+        "bonds"
+    ],
+    "symbol": "EJARA",
+    "artifactUri": "https://tokenized-bond-assets.s3.us-east-2.amazonaws.com/NFT+Chad.png",
+    "displayUri": "https://tokenized-bond-assets.s3.us-east-2.amazonaws.com/NFT+Chad+Medium.png",
+    "thumbnailUri": "https://tokenized-bond-assets.s3.us-east-2.amazonaws.com/NFT+Chad+Small.png",
+    "creators": [
+        "tz1SdDRuhJUuDwg4YitAxz9eqHuTEGRj8urh"
+    ],
+    "formats": [
+        {
+            "mimeType": "image/png",
+            "fileSize": 271360,
+            "fileName": "NFT+Chad.png",
+            "dimensions": {
+                "value": "1148x1568",
+                "unit": "px"
+            },
+            "uri": "https://tokenized-bond-assets.s3.us-east-2.amazonaws.com/NFT+Chad.png"
+        },
+        {
+            "mimeType": "image/png",
+            "fileSize": 184218,
+            "fileName": "NFT+Chad.png",
+            "dimensions": {
+                "value": "512x699",
+                "unit": "px"
+            },
+            "uri": "https://tokenized-bond-assets.s3.us-east-2.amazonaws.com/NFT+Chad+Medium.png"
+        },
+        {
+            "mimeType": "image/png",
+            "fileSize": 76698,
+            "fileName": "NFT+Chad.png",
+            "dimensions": {
+                "value": "256x350",
+                "unit": "px"
+            },
+            "uri": "https://tokenized-bond-assets.s3.us-east-2.amazonaws.com/NFT+Chad+Small.png"
+        }
+    ],
+    "decimals": 0
+}
