@@ -49,3 +49,5 @@ The implementation forked and modified this code https://gitlab.com/tezos-paris-
 `completium-cli call tokenized-bond --entry mint --arg '{"itokenid": 2, "rate": [3, 50], "iamount": 50000000, "expiration": "2026-07-09T00:00:00Z", "custodial": true, "itokenMetadata": [{"key": "", "value": ""}]}'`
 3.
 `completium-cli call tokenized-bond --entry mint --arg '{"itokenid": 3, "rate": [55, 1000], "iamount": 30000000, "expiration": "2026-07-20T00:00:00Z", "custodial": true, "itokenMetadata": [{"key": "", "value": ""}]}'`
+4.
+`completium-cli call tokenized-bond --entry mint --arg '{"itokenid": 4, "rate": [3, 50], "iamount": 15000000, "expiration": "2024-03-22T00:00:00Z", "custodial": true, "itokenMetadata": [{"key": "", "value": ""}]}'`
