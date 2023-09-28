@@ -43,4 +43,9 @@ The implementation forked and modified this code https://gitlab.com/tezos-paris-
 ### Mainnet Initial Mint
 
 ### mint bond
+1.
 `completium-cli call tokenized-bond --entry mint --arg '{"itokenid": 1, "rate": [13, 20], "iamount": 300000000, "expiration": "2024-07-16T00:00:00Z", "custodial": true, "itokenMetadata": [{"key": "", "value": "68747470733a2f2f746f6b656e697a65642d626f6e642d6173736574732e73332e75732d656173742d322e616d617a6f6e6177732e636f6d2f5444324130303030303632382e6a736f6e"}]}'`
+2.
+`completium-cli call tokenized-bond --entry mint --arg '{"itokenid": 2, "rate": [3, 50], "iamount": 50000000, "expiration": "2026-07-09T00:00:00Z", "custodial": true, "itokenMetadata": [{"key": "", "value": ""}]}'`
+3.
+`completium-cli call tokenized-bond --entry mint --arg '{"itokenid": 3, "rate": [55, 1000], "iamount": 30000000, "expiration": "2026-07-20T00:00:00Z", "custodial": true, "itokenMetadata": [{"key": "", "value": ""}]}'`
